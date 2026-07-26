@@ -1,0 +1,581 @@
+name: Spotify Comprehensive Live Status
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # Every 5 minutes
+  push:
+    branches: [ "main" ] # Runs immediately on push to main!
+  repository_dispatch:
+    types: [ping-status]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore History Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: history.json
+          key: status-history-${{ github.run_id }}
+          restore-keys: |
+            status-history-
+
+      - name: Check Endpoints, Record History & Deploy Dashboard
+        run: |
+          mkdir -p _site
+
+          check_ep() {
+            curl -s -o /dev/null -w "%{http_code}:%{time_total}" --max-time 10 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" "$1" || echo "000:0"
+          }
+
+          check_options() {
+            curl -s -o /dev/null -w "%{http_code}:%{time_total}" -X OPTIONS --max-time 10 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" "$1" || echo "000:0"
+          }
+
+          C_RAW=$(check_options "https://clienttoken.spotify.com/v1/clienttoken")
+          A_RAW=$(check_ep "https://accounts.spotify.com")
+          P_RAW=$(check_ep "https://api.spotify.com/v1/")
+          D_RAW=$(check_ep "https://spclient.wg.spotify.com/widevine-license/v1/application-certificate")
+          W_RAW=$(check_ep "https://open.spotify.com")
+
+          TOKEN_CODE=$(echo "$C_RAW" | cut -d: -f1)
+          TOKEN_SEC=$(echo "$C_RAW" | cut -d: -f2)
+          TOKEN_MS=$(python3 -c "import sys; print(int(float('${TOKEN_SEC:-0}') * 1000))" 2>/dev/null || echo "0")
+
+          AUTH_CODE=$(echo "$A_RAW" | cut -d: -f1)
+          AUTH_SEC=$(echo "$A_RAW" | cut -d: -f2)
+          AUTH_MS=$(python3 -c "import sys; print(int(float('${AUTH_SEC:-0}') * 1000))" 2>/dev/null || echo "0")
+
+          API_CODE=$(echo "$P_RAW" | cut -d: -f1)
+          API_SEC=$(echo "$P_RAW" | cut -d: -f2)
+          API_MS=$(python3 -c "print(int(float('${API_SEC:-0}') * 1000))" 2>/dev/null || echo "0")
+
+          DRM_CODE=$(echo "$D_RAW" | cut -d: -f1)
+          DRM_SEC=$(echo "$D_RAW" | cut -d: -f2)
+          DRM_MS=$(python3 -c "print(int(float('${DRM_SEC:-0}') * 1000))" 2>/dev/null || echo "0")
+
+          WEB_CODE=$(echo "$W_RAW" | cut -d: -f1)
+          WEB_SEC=$(echo "$W_RAW" | cut -d: -f2)
+          WEB_MS=$(python3 -c "print(int(float('${WEB_SEC:-0}') * 1000))" 2>/dev/null || echo "0")
+
+          echo "clienttoken      : $TOKEN_CODE (${TOKEN_MS}ms)"
+          echo "accounts         : $AUTH_CODE (${AUTH_MS}ms)"
+          echo "api              : $API_CODE (${API_MS}ms)"
+          echo "drm              : $DRM_CODE (${DRM_MS}ms)"
+          echo "web              : $WEB_CODE (${WEB_MS}ms)"
+
+          is_up() {
+            local code=$1
+            [ "$code" -ge 200 ] && [ "$code" -lt 500 ]
+          }
+
+          TOKEN_OK=0; if is_up "$TOKEN_CODE"; then TOKEN_OK=1; fi
+          AUTH_OK=0; if is_up "$AUTH_CODE"; then AUTH_OK=1; fi
+          API_OK=0; if is_up "$API_CODE"; then API_OK=1; fi
+          DRM_OK=0; if is_up "$DRM_CODE"; then DRM_OK=1; fi
+          WEB_OK=0; if is_up "$WEB_CODE"; then WEB_OK=1; fi
+
+          UP_COUNT=$((TOKEN_OK + AUTH_OK + API_OK + DRM_OK + WEB_OK))
+
+          if [ "$UP_COUNT" -eq 5 ]; then
+            MESSAGE="online (5/5 up)"
+            COLOR="1DB954"
+            DOWN_CLASS=""
+          else
+            FAILURES=""
+            [ "$TOKEN_OK" -eq 1 ] || FAILURES="${FAILURES}token:$TOKEN_CODE "
+            [ "$AUTH_OK" -eq 1 ]  || FAILURES="${FAILURES}auth:$AUTH_CODE "
+            [ "$API_OK" -eq 1 ]   || FAILURES="${FAILURES}api:$API_CODE "
+            [ "$DRM_OK" -eq 1 ]   || FAILURES="${FAILURES}drm:$DRM_CODE "
+            [ "$WEB_OK" -eq 1 ]   || FAILURES="${FAILURES}web:$WEB_CODE "
+            MESSAGE="down (${FAILURES% })"
+            COLOR="ef4444"
+            DOWN_CLASS="down"
+          fi
+
+          export NOW_UTC=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          export TIME_HM=$(date -u +"%H:%M")
+          export MESSAGE="$MESSAGE"
+          export COLOR="$COLOR"
+          export DOWN_CLASS="$DOWN_CLASS"
+          export UP_COUNT="$UP_COUNT"
+          export TOKEN_OK="$TOKEN_OK"
+          export TOKEN_CODE="$TOKEN_CODE"
+          export TOKEN_MS="$TOKEN_MS"
+          export AUTH_OK="$AUTH_OK"
+          export AUTH_CODE="$AUTH_CODE"
+          export AUTH_MS="$AUTH_MS"
+          export API_OK="$API_OK"
+          export API_CODE="$API_CODE"
+          export API_MS="$API_MS"
+          export DRM_OK="$DRM_OK"
+          export DRM_CODE="$DRM_CODE"
+          export DRM_MS="$DRM_MS"
+          export WEB_OK="$WEB_OK"
+          export WEB_CODE="$WEB_CODE"
+          export WEB_MS="$WEB_MS"
+
+          cat <<'EOF' > generate_status.py
+          import json, os
+
+          history = []
+          if os.path.exists('history.json'):
+              try:
+                  with open('history.json', 'r') as f:
+                      history = json.load(f)
+              except Exception:
+                  history = []
+
+          def safe_int(val, default=0):
+              try: return int(val)
+              except Exception: return default
+
+          entry = {
+              'timestamp': os.environ.get('NOW_UTC', ''),
+              'time': os.environ.get('TIME_HM', ''),
+              'status': os.environ.get('MESSAGE', ''),
+              'up_count': safe_int(os.environ.get('UP_COUNT')),
+              'token_ok': safe_int(os.environ.get('TOKEN_OK')), 'token_code': safe_int(os.environ.get('TOKEN_CODE')), 'token_ms': safe_int(os.environ.get('TOKEN_MS')),
+              'auth_ok': safe_int(os.environ.get('AUTH_OK')), 'auth_code': safe_int(os.environ.get('AUTH_CODE')), 'auth_ms': safe_int(os.environ.get('AUTH_MS')),
+              'api_ok': safe_int(os.environ.get('API_OK')), 'api_code': safe_int(os.environ.get('API_CODE')), 'api_ms': safe_int(os.environ.get('API_MS')),
+              'drm_ok': safe_int(os.environ.get('DRM_OK')), 'drm_code': safe_int(os.environ.get('DRM_CODE')), 'drm_ms': safe_int(os.environ.get('DRM_MS')),
+              'web_ok': safe_int(os.environ.get('WEB_OK')), 'web_code': safe_int(os.environ.get('WEB_CODE')), 'web_ms': safe_int(os.environ.get('WEB_MS'))
+          }
+
+          history.append(entry)
+          history = history[-100:]
+
+          with open('history.json', 'w') as f:
+              json.dump(history, f, indent=2)
+
+          with open('_site/history.json', 'w') as f:
+              json.dump(history, f, indent=2)
+
+          # Generate status.json badges
+          msg = os.environ.get('MESSAGE', '')
+          col = os.environ.get('COLOR', '')
+          with open('_site/status.json', 'w') as f:
+              json.dump({'schemaVersion': 1, 'label': 'Spotify', 'message': msg, 'color': col, 'namedLogo': 'spotify', 'logoColor': 'white'}, f)
+
+          def gen_json(label, ok_str, code_str, ms_str, filename):
+              is_ok = safe_int(ok_str) == 1
+              c = '1DB954' if is_ok else 'critical'
+              m = f'up ({code_str} / {ms_str}ms)' if is_ok else f'down ({code_str})'
+              with open(f'_site/{filename}', 'w') as f:
+                  json.dump({'schemaVersion': 1, 'label': f'Spotify {label}', 'message': m, 'color': c}, f)
+
+          gen_json('Token', os.environ.get('TOKEN_OK'), os.environ.get('TOKEN_CODE'), os.environ.get('TOKEN_MS'), 'status-token.json')
+          gen_json('Auth', os.environ.get('AUTH_OK'), os.environ.get('AUTH_CODE'), os.environ.get('AUTH_MS'), 'status-auth.json')
+          gen_json('API', os.environ.get('API_OK'), os.environ.get('API_CODE'), os.environ.get('API_MS'), 'status-api.json')
+          gen_json('DRM', os.environ.get('DRM_OK'), os.environ.get('DRM_CODE'), os.environ.get('DRM_MS'), 'status-drm.json')
+          gen_json('Web', os.environ.get('WEB_OK'), os.environ.get('WEB_CODE'), os.environ.get('WEB_MS'), 'status-web.json')
+
+          # Generate index.html
+          down_class = os.environ.get('DOWN_CLASS', '')
+          t_code = os.environ.get('TOKEN_CODE', ''); t_ms = os.environ.get('TOKEN_MS', '')
+          a_code = os.environ.get('AUTH_CODE', ''); a_ms = os.environ.get('AUTH_MS', '')
+          p_code = os.environ.get('API_CODE', ''); p_ms = os.environ.get('API_MS', '')
+          d_code = os.environ.get('DRM_CODE', ''); d_ms = os.environ.get('DRM_MS', '')
+          w_code = os.environ.get('WEB_CODE', ''); w_ms = os.environ.get('WEB_MS', '')
+          t_cls = '' if os.environ.get('TOKEN_OK') == '1' else 'err'
+          a_cls = '' if os.environ.get('AUTH_OK') == '1' else 'err'
+          p_cls = '' if os.environ.get('API_OK') == '1' else 'err'
+          d_cls = '' if os.environ.get('DRM_OK') == '1' else 'err'
+          w_cls = '' if os.environ.get('WEB_OK') == '1' else 'err'
+          now_utc = os.environ.get('NOW_UTC', '')
+
+          html_content = f'''<!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>SpotiDuck - Live Spotify Status & Latency Graph</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+              * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+              body {{
+                background: #09090b;
+                background-image: 
+                  radial-gradient(at 0% 0%, rgba(29, 185, 84, 0.15) 0px, transparent 50%),
+                  radial-gradient(at 100% 100%, rgba(29, 185, 84, 0.1) 0px, transparent 50%);
+                color: #f4f4f5;
+                font-family: 'Outfit', -apple-system, sans-serif;
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 24px;
+              }}
+              .dashboard {{
+                width: 100%;
+                max-width: 680px;
+                background: rgba(24, 24, 27, 0.75);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 24px;
+                padding: 36px 28px;
+                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+              }}
+              .header {{ text-align: center; margin-bottom: 28px; }}
+              .logo-badge {{
+                display: inline-flex; align-items: center; gap: 8px;
+                background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1);
+                padding: 6px 14px; border-radius: 100px; font-size: 0.85rem; font-weight: 600; color: #a1a1aa; margin-bottom: 14px;
+              }}
+              .title {{
+                font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em;
+                background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
+                -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+              }}
+              .hero-status {{
+                display: inline-flex; align-items: center; gap: 10px; padding: 10px 22px; border-radius: 100px;
+                font-weight: 700; font-size: 1.05rem; background: rgba(29, 185, 84, 0.15);
+                border: 1px solid rgba(29, 185, 84, 0.3); color: #1DB954; margin-top: 14px;
+                box-shadow: 0 0 20px rgba(29, 185, 84, 0.2);
+              }}
+              .hero-status.down {{
+                background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #ef4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+              }}
+              .dot {{
+                width: 10px; height: 10px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; animation: pulse 2s infinite;
+              }}
+              @keyframes pulse {{
+                0% {{ opacity: 1; transform: scale(1); }}
+                50% {{ opacity: 0.5; transform: scale(0.85); }}
+                100% {{ opacity: 1; transform: scale(1); }}
+              }}
+              .services-list {{ display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }}
+              .service-card {{
+                display: flex; align-items: center; justify-content: space-between; padding: 14px 18px;
+                background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);
+                border-radius: 16px; transition: all 0.2s ease;
+              }}
+              .service-card:hover {{
+                background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.12); transform: translateY(-1px);
+              }}
+              .service-info {{ display: flex; flex-direction: column; gap: 3px; max-width: 70%; }}
+              .service-name {{ font-weight: 700; font-size: 0.95rem; color: #f4f4f5; }}
+              .service-role {{ font-size: 0.78rem; color: #a1a1aa; }}
+              .service-sub {{ font-size: 0.72rem; color: #71717a; font-family: 'JetBrains Mono', monospace; }}
+              .service-meta {{ display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }}
+              .code-badge {{
+                font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700;
+                padding: 4px 10px; border-radius: 8px; background: rgba(29, 185, 84, 0.15); color: #1DB954; border: 1px solid rgba(29, 185, 84, 0.25);
+              }}
+              .code-badge.err {{ background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.25); }}
+              .ping-time {{ font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #71717a; }}
+              
+              .chart-header-row {{
+                display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+              }}
+              .section-title {{
+                font-size: 1.1rem; font-weight: 700; color: #f4f4f5; display: flex; align-items: center; gap: 8px;
+              }}
+              .toggle-group {{
+                display: flex; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px; padding: 3px; gap: 2px;
+              }}
+              .toggle-btn {{
+                background: transparent; border: none; color: #a1a1aa; font-family: 'Outfit', sans-serif;
+                font-size: 0.78rem; font-weight: 600; padding: 5px 12px; border-radius: 7px; cursor: pointer; transition: all 0.2s ease;
+              }}
+              .toggle-btn.active {{
+                background: #1DB954; color: #ffffff; font-weight: 700; box-shadow: 0 0 10px rgba(29, 185, 84, 0.3);
+              }}
+
+              .chart-container {{
+                background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 16px; padding: 18px; margin-bottom: 24px; position: relative; height: 260px;
+              }}
+              .history-log {{
+                background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 16px; padding: 16px; max-height: 180px; overflow-y: auto;
+              }}
+              .log-entry {{
+                display: flex; justify-content: space-between; align-items: center;
+                padding: 8px 12px; font-size: 0.82rem; border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+              }}
+              .log-entry:last-child {{ border-bottom: none; }}
+              .log-time {{ color: #a1a1aa; font-family: 'JetBrains Mono', monospace; }}
+              .log-ok {{ color: #1DB954; font-weight: 600; }}
+              .log-down {{ color: #ef4444; font-weight: 600; }}
+
+              .footer {{
+                margin-top: 24px; text-align: center; font-size: 0.75rem; color: #52525b;
+                display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.06);
+              }}
+            </style>
+          </head>
+          <body>
+            <div class="dashboard">
+              <div class="header">
+                <div class="logo-badge">🦆 SpotiDuck Releases</div>
+                <h1 class="title">Spotify Network Status</h1>
+                <div class="hero-status {down_class}">
+                  <div class="dot"></div>
+                  <span>{msg}</span>
+                </div>
+              </div>
+
+              <div class="services-list">
+                <div class="service-card">
+                  <div class="service-info">
+                    <span class="service-name">Client Token Provider</span>
+                    <span class="service-role">Web Client Token Authorization Service</span>
+                    <span class="service-sub">clienttoken.spotify.com/v1/clienttoken</span>
+                  </div>
+                  <div class="service-meta">
+                    <span class="code-badge {t_cls}">{t_code}</span>
+                    <span class="ping-time">{t_ms}ms</span>
+                  </div>
+                </div>
+
+                <div class="service-card">
+                  <div class="service-info">
+                    <span class="service-name">Auth Server</span>
+                    <span class="service-role">OAuth2 & Password Login Authority</span>
+                    <span class="service-sub">accounts.spotify.com</span>
+                  </div>
+                  <div class="service-meta">
+                    <span class="code-badge {a_cls}">{a_code}</span>
+                    <span class="ping-time">{a_ms}ms</span>
+                  </div>
+                </div>
+
+                <div class="service-card">
+                  <div class="service-info">
+                    <span class="service-name">REST API</span>
+                    <span class="service-role">Catalog, Playlists & Pathfinder Metadata</span>
+                    <span class="service-sub">api.spotify.com/v1</span>
+                  </div>
+                  <div class="service-meta">
+                    <span class="code-badge {p_cls}">{p_code}</span>
+                    <span class="ping-time">{p_ms}ms</span>
+                  </div>
+                </div>
+
+                <div class="service-card">
+                  <div class="service-info">
+                    <span class="service-name">DRM License Server</span>
+                    <span class="service-role">Widevine L3 Certificate Authority</span>
+                    <span class="service-sub">spclient.wg.spotify.com</span>
+                  </div>
+                  <div class="service-meta">
+                    <span class="code-badge {d_cls}">{d_code}</span>
+                    <span class="ping-time">{d_ms}ms</span>
+                  </div>
+                </div>
+
+                <div class="service-card">
+                  <div class="service-info">
+                    <span class="service-name">Web Player CDN</span>
+                    <span class="service-role">Web App SPA & Audio Edge CDN</span>
+                    <span class="service-sub">open.spotify.com</span>
+                  </div>
+                  <div class="service-meta">
+                    <span class="code-badge {w_cls}">{w_code}</span>
+                    <span class="ping-time">{w_ms}ms</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="chart-header-row">
+                <div class="section-title">📊 Network Metrics</div>
+                <div class="toggle-group">
+                  <button id="btnStatus" class="toggle-btn active" onclick="switchView('status')">Server Status</button>
+                  <button id="btnLatency" class="toggle-btn" onclick="switchView('latency')">Ping Latency (ms)</button>
+                </div>
+              </div>
+              
+              <div class="chart-container">
+                <canvas id="metricsChart"></canvas>
+              </div>
+
+              <div class="section-title">📜 Outage & Check Log</div>
+              <div class="history-log" id="historyLog">
+                <div style="color: #71717a; text-align: center; padding: 12px; font-size: 0.85rem;">Loading check history...</div>
+              </div>
+
+              <div class="footer">
+                <span>Auto-checks every 5 mins</span>
+                <span>Updated: {now_utc}</span>
+              </div>
+            </div>
+
+            <script>
+              let chartInstance = null;
+              let cachedHistory = [];
+              let currentView = 'status';
+
+              async function loadDashboard() {{
+                try {{
+                  const res = await fetch('./history.json');
+                  cachedHistory = await res.json();
+                  
+                  if (!cachedHistory || cachedHistory.length === 0) return;
+
+                  renderChart();
+                  renderHistoryLog();
+                }} catch (e) {{
+                  console.error('History load error:', e);
+                }}
+              }}
+
+              function switchView(viewMode) {{
+                currentView = viewMode;
+                document.getElementById('btnStatus').classList.toggle('active', viewMode === 'status');
+                document.getElementById('btnLatency').classList.toggle('active', viewMode === 'latency');
+                renderChart();
+              }}
+
+              function renderChart() {{
+                if (!cachedHistory || cachedHistory.length === 0) return;
+
+                const labels = cachedHistory.map(h => h.time);
+                const ctx = document.getElementById('metricsChart').getContext('2d');
+
+                if (chartInstance) {{
+                  chartInstance.destroy();
+                }}
+
+                if (currentView === 'status') {{
+                  const tokenCode = cachedHistory.map(h => h.token_code || 0);
+                  const authCode = cachedHistory.map(h => h.auth_code || 0);
+                  const apiCode = cachedHistory.map(h => h.api_code || 0);
+                  const drmCode = cachedHistory.map(h => h.drm_code || 0);
+                  const webCode = cachedHistory.map(h => h.web_code || 0);
+
+                  chartInstance = new Chart(ctx, {{
+                    type: 'line',
+                    data: {{
+                      labels: labels,
+                      datasets: [
+                        {{ label: 'Token', data: tokenCode, borderColor: '#1DB954', borderWidth: 2, tension: 0.2, pointRadius: 3 }},
+                        {{ label: 'Auth', data: authCode, borderColor: '#3b82f6', borderWidth: 1.5, tension: 0.2, pointRadius: 2 }},
+                        {{ label: 'API', data: apiCode, borderColor: '#a855f7', borderWidth: 1.5, tension: 0.2, pointRadius: 2 }},
+                        {{ label: 'DRM', data: drmCode, borderColor: '#f59e0b', borderWidth: 1.5, tension: 0.2, pointRadius: 2 }},
+                        {{ label: 'Web', data: webCode, borderColor: '#06b6d4', borderWidth: 1.5, tension: 0.2, pointRadius: 2 }}
+                      ]
+                    }},
+                    options: {{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {{
+                        legend: {{ labels: {{ color: '#a1a1aa', font: {{ family: 'Outfit', size: 11 }} }} }},
+                        tooltip: {{
+                          callbacks: {{
+                            label: function(context) {{
+                              const code = context.raw;
+                              const ok = code >= 200 && code < 500;
+                              return context.dataset.label + ': HTTP ' + code + ' (' + (ok ? '🟢 OK' : '🔴 Error') + ')';
+                            }}
+                          }}
+                        }}
+                      }},
+                      scales: {{
+                        x: {{ grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#71717a', font: {{ family: 'JetBrains Mono', size: 10 }} }} }},
+                        y: {{
+                          min: 0,
+                          grid: {{ color: 'rgba(255,255,255,0.05)' }},
+                          ticks: {{
+                            color: '#71717a',
+                            font: {{ family: 'JetBrains Mono', size: 10 }},
+                            callback: function(value) {{ return value; }}
+                          }}
+                        }}
+                      }}
+                    }}
+                  }});
+                }} else {{
+                  const tokenMs = cachedHistory.map(h => h.token_ms);
+                  const authMs = cachedHistory.map(h => h.auth_ms);
+                  const apiMs = cachedHistory.map(h => h.api_ms);
+                  const drmMs = cachedHistory.map(h => h.drm_ms);
+                  const webMs = cachedHistory.map(h => h.web_ms);
+
+                  chartInstance = new Chart(ctx, {{
+                    type: 'line',
+                    data: {{
+                      labels: labels,
+                      datasets: [
+                        {{ label: 'Token (ms)', data: tokenMs, borderColor: '#1DB954', borderWidth: 2, tension: 0.3, pointRadius: 0 }},
+                        {{ label: 'Auth (ms)', data: authMs, borderColor: '#3b82f6', borderWidth: 1.5, tension: 0.3, pointRadius: 0 }},
+                        {{ label: 'API (ms)', data: apiMs, borderColor: '#a855f7', borderWidth: 1.5, tension: 0.3, pointRadius: 0 }},
+                        {{ label: 'DRM (ms)', data: drmMs, borderColor: '#f59e0b', borderWidth: 1.5, tension: 0.3, pointRadius: 0 }},
+                        {{ label: 'Web (ms)', data: webMs, borderColor: '#06b6d4', borderWidth: 1.5, tension: 0.3, pointRadius: 0 }}
+                      ]
+                    }},
+                    options: {{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {{
+                        legend: {{ labels: {{ color: '#a1a1aa', font: {{ family: 'Outfit', size: 11 }} }} }}
+                      }},
+                      scales: {{
+                        x: {{ grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#71717a', font: {{ family: 'JetBrains Mono', size: 10 }} }} }},
+                        y: {{ grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#71717a', font: {{ family: 'JetBrains Mono', size: 10 }} }} }}
+                      }}
+                    }}
+                  }});
+                }}
+              }}
+
+              function renderHistoryLog() {{
+                const logContainer = document.getElementById('historyLog');
+                logContainer.innerHTML = '';
+                
+                const recent = [...cachedHistory].reverse();
+                recent.forEach(item => {{
+                  const div = document.createElement('div');
+                  div.className = 'log-entry';
+                  const isOk = item.up_count === 5;
+                  const statusText = isOk ? '🟢 Online (5/5)' : '🔴 ' + item.status;
+                  const statusClass = isOk ? 'log-ok' : 'log-down';
+                  
+                  div.innerHTML = '<span class="log-time">' + item.timestamp + '</span><span class="' + statusClass + '">' + statusText + '</span>';
+                  logContainer.appendChild(div);
+                }});
+              }}
+
+              loadDashboard();
+            </script>
+          </body>
+          </html>'''
+
+          with open('_site/index.html', 'w') as f:
+              f.write(html_content)
+          EOF
+          python3 generate_status.py
+          rm -f generate_status.py
+
+      - name: Save History Cache
+        uses: actions/cache/save@v4
+        with:
+          path: history.json
+          key: status-history-${{ github.run_id }}
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
