@@ -1,0 +1,20 @@
+{
+  "short_name": "SpotiDuck",
+  "name": "SpotiDuck — Native Spotify Web Client",
+  "description": "High-performance Spotify Web Client with built-in ad-blocking, offline retry engine, and download progress manager.",
+  "icons": [
+    {
+      "src": "logo.webp",
+      "type": "image/webp",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "display": "standalone",
+  "orientation": "any",
+  "scope": "./",
+  "categories": ["music", "entertainment", "utilities"]
+}

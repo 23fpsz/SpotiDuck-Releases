@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SpotiDuck — Native Spotify Web Client</title>
+
+  <!-- PWA & Mobile Meta -->
+  <meta name="theme-color" content="#09090b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="SpotiDuck is a high-performance Spotify Web Client wrapper featuring built-in ad-blocking, media controls, connection retry management, and download status tracking.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/webp" href="logo.webp">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Chart.js for Status Metrics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="app-root">
+
+    <!-- Connection Lost / Offline Banner -->
+    <div id="connection-banner" class="connection-banner">
+      <div class="banner-content">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-3.16M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+        <span id="banner-text">Connection lost. Auto-retrying in <strong id="retry-countdown">5</strong>s...</span>
+      </div>
+      <div class="banner-actions">
+        <button id="btn-manual-retry" class="btn-retry">Retry Now</button>
+      </div>
+    </div>
+
+    <!-- App Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <img src="logo.webp" alt="SpotiDuck Logo" class="brand-logo">
+        <span class="brand-title">SpotiDuck 🦆</span>
+      </div>
+      <div class="header-actions">
+        <div id="network-badge" class="network-badge online">
+          <span class="status-dot"></span>
+          <span id="network-status-text">Online</span>
+        </div>
+        <button id="btn-quick-download" class="action-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span>Downloads</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- App Main Content Area -->
+    <main class="app-content">
+
+      <!-- TAB 1: Player View -->
+      <section id="tab-player" class="tab-pane active">
+        <div class="player-container">
+          <div class="web-frame-wrapper">
+            <iframe id="spotify-frame" class="web-frame" src="https://open.spotify.com" title="Spotify Web Player" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>
+            
+            <!-- Offline Fallback Layer -->
+            <div id="offline-layer" class="offline-fallback" style="display: none;">
+              <div class="offline-icon">📡</div>
+              <h2 class="offline-title">No Internet Connection</h2>
+              <p class="offline-desc">SpotiDuck is unable to connect to Spotify servers. Please check your network connection or try retrying.</p>
+              <button id="btn-offline-retry" class="action-btn primary" style="margin-top: 12px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <span>Retry Connection</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: Download & Cache Progress Manager -->
+      <section id="tab-downloads" class="tab-pane">
+        <div class="downloads-container">
+          <div class="section-header">
+            <h2 class="section-title">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              <span>Download & Offline Manager</span>
+            </h2>
+            <button id="btn-add-test-dl" class="action-btn primary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              <span>Simulate Download</span>
+            </button>
+          </div>
+
+          <!-- Overall Download Progress Card -->
+          <div class="download-summary-card">
+            <div class="summary-stat">
+              <span id="dl-total-count" class="stat-value">0</span>
+              <span class="stat-label">Total Cached Media</span>
+            </div>
+            <div class="summary-stat">
+              <span id="dl-total-size" class="stat-value">0.0 MB</span>
+              <span class="stat-label">Total Downloaded</span>
+            </div>
+            <div class="summary-stat">
+              <span id="dl-speed" class="stat-value">0 KB/s</span>
+              <span class="stat-label">Transfer Speed</span>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">
+                <span>Overall Cache Sync Progress</span>
+                <span id="dl-progress-percent">100%</span>
+              </div>
+              <div class="progress-bar-container">
+                <div id="dl-progress-fill" class="progress-fill" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Downloaded Items List -->
+          <div class="section-header" style="margin-top: 8px;">
+            <h3 class="section-title" style="font-size: 1.05rem;">Downloaded Assets & Tracks</h3>
+            <button id="btn-clear-downloads" class="action-btn" style="font-size: 0.8rem; padding: 4px 10px;">Clear Cache</button>
+          </div>
+
+          <div id="download-list" class="download-items-list">
+            <!-- Dynamic Download Items will be inserted here by app.js -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: Spotify Live Status -->
+      <section id="tab-status" class="tab-pane">
+        <div class="status-grid">
+          <div class="section-header">
+            <h2 class="section-title">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              <span>Spotify Infrastructure Health</span>
+            </h2>
+            <button id="btn-refresh-status" class="action-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Refresh Pings</span>
+            </button>
+          </div>
+
+          <div id="services-list" class="services-list">
+            <!-- Service Cards populated by JS -->
+          </div>
+
+          <div class="section-header" style="margin-top: 12px;">
+            <h3 class="section-title" style="font-size: 1.05rem;">Latency Metrics Chart</h3>
+          </div>
+          <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; height: 260px;">
+            <canvas id="statusChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: App Settings -->
+      <section id="tab-settings" class="tab-pane">
+        <div class="status-grid">
+          <div class="section-header">
+            <h2 class="section-title">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <span>App Settings & Performance</span>
+            </h2>
+          </div>
+
+          <div class="service-card">
+            <div class="service-meta-col">
+              <span class="service-name">Ad-Blocker & Script Engine</span>
+              <span class="service-endpoint">Built-in Spotify Web Player Ad Filtering</span>
+            </div>
+            <span class="badge-code">Active (247 blocked)</span>
+          </div>
+
+          <div class="service-card">
+            <div class="service-meta-col">
+              <span class="service-name">Offline Mode & Cache Strategy</span>
+              <span class="service-endpoint">Service Worker Cache-First Engine</span>
+            </div>
+            <span class="badge-code">Enabled</span>
+          </div>
+
+          <div class="service-card">
+            <div class="service-meta-col">
+              <span class="service-name">User-Agent Compatibility Engine</span>
+              <span class="service-endpoint">Desktop Chrome 124 Emulation</span>
+            </div>
+            <span class="badge-code">Optimized</span>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="app-nav">
+      <div class="nav-item active" data-tab="tab-player">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span>Player</span>
+      </div>
+      <div class="nav-item" data-tab="tab-downloads">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        <span>Downloads</span>
+      </div>
+      <div class="nav-item" data-tab="tab-status">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span>Status</span>
+      </div>
+      <div class="nav-item" data-tab="tab-settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </div>
+    </nav>
+
+  </div>
+
+  <!-- Main JavaScript Engine -->
+  <script src="app.js"></script>
+</body>
+</html>

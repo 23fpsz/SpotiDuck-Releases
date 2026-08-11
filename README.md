@@ -2,41 +2,44 @@
   <img src="./logo.webp" width="120" alt="SpotiDuck Logo" />
 </p>
 
-<h1 align="center">SpotiDuck Releases 🦆</h1>
+<h1 align="center">SpotiDuck 🦆</h1>
 
 <p align="center">
-  <a href="https://github.com/23fpsz/SpotiDuck-Releases/releases/latest">
-    <img src="https://img.shields.io/badge/Download-Latest_APK-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Download Latest APK" height="40" />
+  <a href="https://github.com/RMNO21/SpotiDuck/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Latest_Release-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Download Latest Release" height="40" />
   </a>
-</p>
-
-<p align="center">
   <a href="https://discord.gg/NNXDGZEDFs">
     <img src="https://img.shields.io/badge/Join-Discord_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord Community" height="40" />
   </a>
 </p>
 
 <p align="center">
-  <a href="https://23fpsz.github.io/SpotiDuck-Releases/">
-    <img src="https://img.shields.io/endpoint?url=https://23fpsz.github.io/SpotiDuck-Releases/status.json&style=for-the-badge&cacheSeconds=60" alt="Spotify Status" height="40" />
-  </a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white&style=flat-square" alt="Platform" />
-  <img src="https://img.shields.io/badge/Kotlin-1.9+-7F52FF?logo=kotlin&logoColor=white&style=flat-square" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/Platform-Android_%2F_PWA-3DDC84?logo=android&logoColor=white&style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/badge/PWA-Supported-7F52FF?logo=pwa&logoColor=white&style=flat-square" alt="PWA Ready" />
   <img src="https://img.shields.io/badge/License-GNU_GPLv3-blue?style=flat-square" alt="License" />
 </p>
 
-> [!WARNING]
-> **Official Source Only:** SpotiDuck is **only** published and distributed on this official GitHub repository. Do not download or trust builds of this application from any other websites, app stores, or third-party channels, as they are unverified and may contain malicious modifications.
+---
 
-Welcome to the download and releases page for **SpotiDuck**—a high-performance, web-wrapped Spotify client for Android featuring built-in ad-blocking, media controls, and widgets.
+Welcome to **SpotiDuck**—a high-performance, native-like web client for Spotify featuring built-in ad-blocking, intelligent connection retry management, download & cache progress tracking, and offline Service Worker resilience.
 
-By wrapping the Spotify Web Player in a highly optimized Android WebView, SpotiDuck combines the full feature set of Spotify's web browser experience with native Android integrations—such as background service control, built-in ad-blocking, lock screen media sessions, widgets, and Android Auto.
+By wrapping Spotify in an optimized native App Shell (PWA), SpotiDuck delivers a fast, desktop-grade Spotify experience with seamless native controls—eliminating the clunky "bare WebView" feel.
 
-> [!NOTE]
-> **Credits:** SpotiDuck is built upon and inspired by **Spotifuck**, the original unofficial Android Spotify web wrapper developed by **deviato**. We would like to express our gratitude to the original creator for laying the groundwork for this project.
+---
+
+## ⚡ Key Features
+
+* **⚡ Native App Shell & UI**: Modern glassmorphic interface with bottom navigation, responsive tabs, smooth micro-animations, and custom dark mode styling.
+* **📡 Intelligent Connection Lost & Retry Engine**:
+  * Real-time network detection with non-intrusive alert banners.
+  * Automatic retry countdowns with exponential backoff strategy.
+  * Manual "Retry Connection" button to instantly test network reachability.
+* **📥 Download & Cache Progress Manager**:
+  * Displays active and cached downloads, track sizes, percentage progress, and transfer speeds.
+  * Total downloaded size metrics and cache-clearing management.
+* **🛡️ Built-in Ad-Blocking & User-Agent Emulation**: Bypasses mobile WebView playback restrictions by disguising traffic as modern desktop client sessions.
+* **📶 Live Spotify Health Monitoring**: Integrated status checks for Spotify Client Token, OAuth Auth, REST API, Widevine DRM, and Edge CDN endpoints.
+* **📲 Progressive Web App (PWA)**: Standalone display mode, Service Worker cache-first offline support, and installable app manifest (`manifest.json`).
 
 ---
 
@@ -53,18 +56,18 @@ By wrapping the Spotify Web Player in a highly optimized Android WebView, SpotiD
   <img src="./screenshots/widget.png" width="47%" alt="Widget Support" />
 </p>
 
-<p align="center">
-  <img src="./screenshots/landscape_mode.png" width="60%" alt="Landscape Mode" />
-</p>
-
 ---
 
-## ⚠️ Compatibility & Playback Warnings
+## 🛠️ Local Development & Testing
 
-The application might not function correctly under the following conditions:
+You can run the native app shell locally using any HTTP server:
 
-1. **Account Limitations**: Free accounts may experience playback loading errors on mobile WebViews. While SpotiDuck includes settings to handle platform compatibility, server-side changes to player browser policies may affect playback stability.
-2. **Third-Party Logins**: Google or Facebook sign-ins may occasionally block authentications inside embedded browsers. Adjusting the compatibility configuration or user-agent scaling in settings may resolve these sign-in hurdles.
-3. **DRM & Media Pipelines**: Secure media playback requires device-level DRM support. Custom ROMs or devices lacking proper security certifications may fail to start media streams.
-4. **Aggressive Filters**: Loading custom or overly restrictive filter blocklists in settings can block essential server endpoints, preventing tracks from playing.
-5. **System WebView Version**: For proper compatibility with preloading and layout adjustments, keep your device's System WebView updated to the latest version via the Google Play Store.
+```bash
+# Python
+python -m http.server 8080
+
+# Node.js
+npx http-server -p 8080
+```
+
+Open `http://localhost:8080` in your browser to launch the SpotiDuck App Shell.

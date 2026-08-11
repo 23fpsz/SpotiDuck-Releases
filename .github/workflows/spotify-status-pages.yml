@@ -36,6 +36,8 @@ jobs:
       - name: Check Endpoints, Record History & Deploy Dashboard
         run: |
           mkdir -p _site
+          cp -r index.html styles.css app.js sw.js manifest.json logo.webp screenshots _site/ 2>/dev/null || true
+
 
           check_ep() {
             curl -s -o /dev/null -w "%{http_code}:%{time_total}" --max-time 10 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" "$1" || echo "000:0"
