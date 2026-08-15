@@ -59,6 +59,17 @@ By wrapping the Spotify Web Player in a highly optimized Android WebView, SpotiD
 
 ---
 
+## 📥 Installation & Setup Guide
+
+1. **Download the APK**: Download the latest `.apk` file from the [Releases](https://github.com/23fpsz/SpotiDuck-Releases/releases/latest) page.
+2. **Enable Unknown Sources**: If prompted by Android, allow installation from unknown sources (*Settings > Apps > Special app access > Install unknown apps*).
+3. **Install & Open**: Open the downloaded `.apk` file and tap **Install**.
+4. **Background Playback Optimization**: To prevent Android's power manager from killing the audio service in the background:
+   - Navigate to **Settings > Apps > SpotiDuck > Battery / App battery usage**.
+   - Select **Unrestricted** (or disable battery optimization).
+
+---
+
 ## ⚠️ Compatibility & Playback Warnings
 
 The application might not function correctly under the following conditions:
