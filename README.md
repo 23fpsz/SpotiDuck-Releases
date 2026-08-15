@@ -79,3 +79,25 @@ The application might not function correctly under the following conditions:
 3. **DRM & Media Pipelines**: Secure media playback requires device-level DRM support. Custom ROMs or devices lacking proper security certifications may fail to start media streams.
 4. **Aggressive Filters**: Loading custom or overly restrictive filter blocklists in settings can block essential server endpoints, preventing tracks from playing.
 5. **System WebView Version**: For proper compatibility with preloading and layout adjustments, keep your device's System WebView updated to the latest version via the Google Play Store.
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+<details>
+<summary><b>Why does playback pause when locking my phone or switching apps?</b></summary>
+
+Android battery optimization often aggressively terminates background WebViews. Ensure battery usage is set to **Unrestricted** under *Settings > Apps > SpotiDuck > Battery*.
+</details>
+
+<details>
+<summary><b>How do I fix Google or third-party login errors?</b></summary>
+
+Google prevents sign-ins inside certain custom WebViews. If you encounter a "disallowed_useragent" error, log in using your Spotify email and password directly, or set your password in Spotify account management.
+</details>
+
+<details>
+<summary><b>The app shows a blank screen or won't load music.</b></summary>
+
+Update **Android System WebView** to the latest release via Google Play Store and restart the application.
+</details>
