@@ -2,7 +2,7 @@
   <img src="./logo.webp" width="120" alt="SpotiDuck Logo" />
 </p>
 
-<h1 align="center">SpotiDuck Releases 🦆</h1>
+<h1 align="center">SpotiDuck Releasess 🦆</h1>
 
 <p align="center">
   <a href="https://github.com/23fpsz/SpotiDuck-Releases/releases/latest">
