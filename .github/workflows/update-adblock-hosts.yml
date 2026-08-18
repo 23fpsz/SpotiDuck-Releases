@@ -1,0 +1,144 @@
+name: Update AdBlock Hosts
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # Runs daily at 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-hosts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Fetch and Compile AdBlock Domains
+        run: |
+          python3 - << 'EOF'
+          import urllib.request
+          import re
+
+          urls = [
+              # --- Brave Shields Official First-Party List ---
+              "https://raw.githubusercontent.com/brave/adblock-lists/master/brave-lists/brave-firstparty.txt",
+
+              # --- SpotX-Official & Spotify Audio Specific Lists ---
+              "https://raw.githubusercontent.com/SpotX-Official/SpotX-Bash/main/spotx.sh",
+              "https://raw.githubusercontent.com/Isaaker/Spotify-AdsList/main/Lists/standard_list.txt",
+
+              # --- Web Player & Mobile Ad Server Filters ---
+              "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt",
+              "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/MobileFilter/sections/adservers.txt"
+          ]
+
+          # Essential Spotify domains that MUST NEVER be blocked
+          whitelisted_domains = {
+              "spotify.com",
+              "open.spotify.com",
+              "accounts.spotify.com",
+              "login.spotify.com",
+              "login2.spotify.com",
+              "i.scdn.co",
+              "xpui.app.spotify.com",
+              "spclient.wg.spotify.com",
+              "gae-spclient.spotify.com",
+              "gew1-spclient.spotify.com",
+              "guc-spclient.spotify.com",
+              "sto-spclient.spotify.com",
+              "ap.spotify.com",
+              "dealer.spotify.com",
+              "client.spotify.com"
+          }
+
+          domains = set()
+
+          for u in urls:
+              try:
+                  req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+                  with urllib.request.urlopen(req, timeout=15) as res:
+                      content = res.read().decode('utf-8', errors='ignore')
+                      for line in content.splitlines():
+                          line = line.strip()
+                          if not line or line.startswith('#') or line.startswith('!'):
+                              continue
+                          
+                          # Remove inline comments
+                          if '#' in line:
+                              line = line.split('#')[0].strip()
+                          if '!' in line:
+                              line = line.split('!')[0].strip()
+                          
+                          # Clean AdGuard ||domain^ syntax
+                          if line.startswith('||'):
+                              line = line[2:]
+                          if '^' in line:
+                              line = line.split('^')[0]
+                          
+                          # Clean hosts file 0.0.0.0 / 127.0.0.1 prefix
+                          parts = line.split()
+                          if len(parts) >= 2 and parts[0] in ['0.0.0.0', '127.0.0.1']:
+                              line = parts[1]
+                          elif len(parts) == 1:
+                              line = parts[0]
+                          
+                          # Validate clean domain
+                          line = line.lower().strip()
+                          if re.match(r'^[a-z0-9\.\-]+$', line) and '.' in line and not line.startswith('.') and not line.endswith('.'):
+                              if line not in whitelisted_domains:
+                                  domains.add(line)
+              except Exception as e:
+                  print(f"Failed to fetch {u}: {e}")
+
+          # Always ensure core Spotify ad domains are present
+          core_spotify_domains = [
+              "audio-ads.spotify.com",
+              "ads-akp.spotify.com",
+              "ads-fa.spotify.com",
+              "mp3ad.scdn.co",
+              "adstudio-assets.scdn.co",
+              "adstudio.spotify.com",
+              "adeventtracker.spotify.com",
+              "pixel.spotify.com",
+              "pixel-static.spotify.com",
+              "aet.spotify.com",
+              "doubleclick.net",
+              "googlesyndication.com",
+              "amillionads.com",
+              "2mdn.net",
+              "adxcel.com",
+              "fastly-insights.com",
+              "sentry.io",
+              "adsrvr.org",
+              "tracker.samplicio.us",
+              "t.6sc.co"
+          ]
+
+          for d in core_spotify_domains:
+              if d not in whitelisted_domains:
+                  domains.add(d)
+
+          sorted_domains = sorted(list(domains))
+          print(f"Compiled {len(sorted_domains)} unique ad domains.")
+
+          # Write out clean compiled adblock_hosts.txt file at repository root
+          with open("adblock_hosts.txt", "w", encoding="utf-8") as f:
+              f.write("# SpotiDuck Compiled AdBlock Hostlist\n")
+              f.write("# Auto-updated daily from Brave Shields, SpotX-Official, uBlock Origin, AdGuard, & Spotify-AdsList\n\n")
+              for d in sorted_domains:
+                  f.write(f"0.0.0.0 {d}\n")
+          EOF
+
+      - name: Commit and Push Updated Hostlist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add adblock_hosts.txt
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore(adblock): auto-update compiled adblock_hosts.txt" && git push)
