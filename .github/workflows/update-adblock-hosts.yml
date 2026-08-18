@@ -39,7 +39,7 @@ jobs:
               "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/MobileFilter/sections/adservers.txt"
           ]
 
-          # Essential Spotify domains that MUST NEVER be blocked
+          # Essential Spotify & Podcast domains that MUST NEVER be blocked
           whitelisted_domains = {
               "spotify.com",
               "open.spotify.com",
@@ -68,6 +68,10 @@ jobs:
                       for line in content.splitlines():
                           line = line.strip()
                           if not line or line.startswith('#') or line.startswith('!'):
+                              continue
+                          
+                          # Skip Cosmetic Element-Hiding CSS rules (e.g. domain.com##.ad-banner)
+                          if '##' in line or '#@#' in line or '#?#' in line:
                               continue
                           
                           # Remove inline comments
