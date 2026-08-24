@@ -29,6 +29,7 @@
 0.0.0.0 11.video-ak.cdn.spotify.com
 0.0.0.0 12.audio-ak.cdn.spotify.com
 0.0.0.0 12.video-ak.cdn.spotify.com
+0.0.0.0 127.0.0.1
 0.0.0.0 13.audio-ak.cdn.spotify.com
 0.0.0.0 13.video-ak.cdn.spotify.com
 0.0.0.0 14.audio-ak.cdn.spotify.com
@@ -843,6 +844,7 @@
 0.0.0.0 bblivecams.com
 0.0.0.0 bc.audio-ak.cdn.spotify.com
 0.0.0.0 bc.video-ak.cdn.spotify.com
+0.0.0.0 bcdn-16c9d93d.bankofscotland.co.uk
 0.0.0.0 bcfads.com
 0.0.0.0 bd.audio-ak.cdn.spotify.com
 0.0.0.0 bd.moatads.com
@@ -1005,6 +1007,8 @@
 0.0.0.0 charts-images.scdn.co
 0.0.0.0 chaturbate.com
 0.0.0.0 chavoads.com
+0.0.0.0 check2.bankofscotland.co.uk
+0.0.0.0 check3.tiaa.org
 0.0.0.0 chopflexhit.online
 0.0.0.0 ciphercapital.tech
 0.0.0.0 citi.com
@@ -1063,6 +1067,7 @@
 0.0.0.0 consent.easybrain.com
 0.0.0.0 content.bitsontherun.com
 0.0.0.0 content.canadiantire.ca
+0.0.0.0 content.discover.com
 0.0.0.0 content.tab.com.au
 0.0.0.0 content22.bmo.com
 0.0.0.0 content22.citi.eu
@@ -1660,6 +1665,7 @@
 0.0.0.0 lnk.news
 0.0.0.0 lnk.parts
 0.0.0.0 log-185a61e7.bendigobank.com.au
+0.0.0.0 log-2ffe60ee.westpac.com.au
 0.0.0.0 log.spotify.com
 0.0.0.0 log2.spotify.com
 0.0.0.0 login-signup.scdn.co
@@ -2285,6 +2291,7 @@
 0.0.0.0 tm-eps.neutrino.nu
 0.0.0.0 tm1.hoiplay.com
 0.0.0.0 tmetrix.my.chick-fil-a.com
+0.0.0.0 tmx.bestbuy.com
 0.0.0.0 tmx.td.com
 0.0.0.0 tmz.vo.llnwd.net
 0.0.0.0 tnc16-alisg.isnssdk.com
@@ -2329,6 +2336,7 @@
 0.0.0.0 u.admob.com
 0.0.0.0 u.moatads.com
 0.0.0.0 u.scdn.co
+0.0.0.0 u46.pnc.com
 0.0.0.0 u47.pnc.com
 0.0.0.0 u652.myplainview.com
 0.0.0.0 u927.sfgate.com
@@ -2445,6 +2453,7 @@
 0.0.0.0 wsback-get-config.presage.io
 0.0.0.0 wtraff.com
 0.0.0.0 wup-185a61e7.bendigobank.com.au
+0.0.0.0 wup-2ffe60ee.westpac.com.au
 0.0.0.0 www-001.lon.spotify.com
 0.0.0.0 www.adbert.com.tw
 0.0.0.0 www.admob.com
