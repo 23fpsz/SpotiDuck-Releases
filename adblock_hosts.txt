@@ -937,6 +937,7 @@
 0.0.0.0 padspms.com
 0.0.0.0 pagead46.l.doubleclick.net
 0.0.0.0 painsko.com
+0.0.0.0 palateonce.com
 0.0.0.0 pandanetwork.club
 0.0.0.0 pangle.io
 0.0.0.0 pangolin16.isnssdk.com
