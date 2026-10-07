@@ -28,6 +28,7 @@
 0.0.0.0 acala-bridge.com
 0.0.0.0 activistpost.com
 0.0.0.0 activity.browser.intl.miui.com
+0.0.0.0 acustomizedgift.com
 0.0.0.0 ad-api.ehawk.com
 0.0.0.0 ad-api.maxnapps.com
 0.0.0.0 ad-api.revoaidapp.com
@@ -1119,6 +1120,7 @@
 0.0.0.0 static.timetreeads.com
 0.0.0.0 stream.spongead.com
 0.0.0.0 strpjmp.com
+0.0.0.0 succeedscene.com
 0.0.0.0 sugaringsofia2.com
 0.0.0.0 sumatoad.com
 0.0.0.0 supersonicads-a.akamaihd.net
