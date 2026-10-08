@@ -26,6 +26,7 @@
 0.0.0.0 abtest.mistat.xiaomi.com
 0.0.0.0 abtest.swrve.com
 0.0.0.0 acala-bridge.com
+0.0.0.0 acdn.newshuntads.com
 0.0.0.0 activistpost.com
 0.0.0.0 activity.browser.intl.miui.com
 0.0.0.0 acustomizedgift.com
