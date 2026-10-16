@@ -161,6 +161,7 @@
 0.0.0.0 ads-leaseweb.appsgeyser.com
 0.0.0.0 ads-m.rustore.ru
 0.0.0.0 ads-management.su
+0.0.0.0 ads-proxy-aka.prod.bo.canal.canalplustech.pro
 0.0.0.0 ads-resources.waze.com
 0.0.0.0 ads-router-noneu.truecaller.com
 0.0.0.0 ads-sdk.mattel163.com
