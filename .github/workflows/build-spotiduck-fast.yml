@@ -212,6 +212,29 @@ jobs:
           node --check decoded/assets/playlist_sort.js
 
 
+      - name: Inspect the existing native widget safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Widget provider registration ==="
+          grep -n -E 'HomeWidget|appwidget.provider|APPWIDGET_UPDATE' decoded/AndroidManifest.xml
+          echo "=== Widget layouts and size policy ==="
+          for f in decoded/res/layout/home_widget.xml decoded/res/layout/widget_expanded.xml decoded/res/xml/home_widget_info.xml; do
+            echo "--- $f ---"
+            test -f "$f" && cat "$f" || { echo "MISSING: $f"; exit 1; }
+          done
+          echo "=== Widget IDs in resource tables ==="
+          grep -n -E 'btn_shuffle|btn_prev|btn_play|btn_next|btn_repeat|btn_fav|txt_title|txt_artist|img_cover|widget_root|progress_row|txt_playlist|playlist_tile' decoded/res/values/public.xml decoded/res/values/ids.xml 2>/dev/null || true
+          echo "=== Widget updater: button wiring and data fields ==="
+          WIDGET_BUILDER="decoded/smali/com/spotiduck/music/a.smali"
+          test -f "$WIDGET_BUILDER"
+          grep -n -E 'method public static d\(|setOnClickPendingIntent|setTextViewText|setImageViewResource|btn_shuffle|btn_prev|btn_play|btn_next|btn_repeat|btn_fav|SHUFFLE_ACTION|REPEAT_ACTION|WIDGET_NEXT|WIDGET_PREV|WIDGET_PLAYPAUSE|ADDTOFAV_ACTION' "$WIDGET_BUILDER" | head -n 200
+          echo "=== Existing JS-to-native media status contract ==="
+          grep -n -E 'track|artist|cover|playlist|AndBridge|recMedia|updateMedia|setMedia' decoded/assets/spotify_bridge.js | head -n 160 || true
+          echo "=== Native bridge metadata setters ==="
+          grep -R -n -E 'Ljava/lang/String;->(track|artist|cover|playlist)|updateWidget|setMedia|WebService;->(s|t):Ljava/lang/String;' decoded/smali/com/spotiduck/music | head -n 160 || true
+          echo "Inspection only: no widget resources or runtime code changed by this step."
+
       - name: Diagnose GitHub redirect handling
         shell: bash
         run: |
