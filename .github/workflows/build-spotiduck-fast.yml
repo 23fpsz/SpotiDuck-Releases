@@ -262,9 +262,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== Native widget-related decoded source files ==="
-          find decoded/smali* decoded/res -type f \\
-            \( -iname '*HomeWidget*' -o -iname '*widget*' -o -iname '*MediaActionReceiver*' \) \\
-            | sort | head -n 160
+          find decoded/smali decoded/res -type f \( -iname '*HomeWidget*' -o -iname '*widget*' -o -iname '*MediaActionReceiver*' \) | sort | head -n 160
           echo "=== Widget provider/receiver registration in manifest ==="
           grep -n -B 8 -A 18 -E 'HomeWidget|APPWIDGET_UPDATE|home_widget_info|MediaActionReceiver' decoded/AndroidManifest.xml || true
           echo "=== Decoded widget metadata ==="
@@ -272,10 +270,9 @@ jobs:
             if [ -f "$f" ]; then echo "--- $f"; sed -n '1,260p' "$f"; fi
           done
           echo "=== HomeWidget and media control handlers ==="
-          find decoded/smali* -type f \\
-            \( -name 'HomeWidget.smali' -o -name 'WebService$MediaActionReceiver.smali' -o -name 'WebService.smali' \) \\
-            -print -exec sed -n '1,320p' {} \\
-            \; 2>/dev/null | head -n 1800
+          find decoded/smali -type f \( -name 'HomeWidget.smali' -o -name 'WebService$MediaActionReceiver.smali' -o -name 'WebService.smali' \) -print | while read -r f; do
+            echo "--- $f"; sed -n '1,320p' "$f";
+          done | head -n 1800
 
       - name: Rebuild APK
         shell: bash
