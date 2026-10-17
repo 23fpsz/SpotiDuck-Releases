@@ -312,6 +312,14 @@ jobs:
           "$BT/aapt" dump badging SpotiDuck-Fast.apk | head -n 5
           sha256sum SpotiDuck-Fast.apk
 
+      - name: Upload widget source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpotiDuck-widget-source-debug
+          path: widget-source-debug.zip
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
