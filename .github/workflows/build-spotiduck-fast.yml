@@ -111,15 +111,18 @@ jobs:
           # signed build must pass that one launcher gate to run.
           main_activity = Path("decoded/smali/com/spotiduck/music/MainActivity.smali")
           smali = main_activity.read_text(encoding="utf-8")
-          guard_pattern = re.compile(
-              r"^\.method public final u\(\)Z\\n.*?^\.end method",
-              re.MULTILINE | re.DOTALL,
-          )
-          guard_match = guard_pattern.search(smali)
-          if (not guard_match
-              or "AndBridge;->isSignatureValid()Z" not in guard_match.group(0)
-              or "https://github.com/23fpsz/SpotiDuck-Releases" not in guard_match.group(0)):
-              raise SystemExit("Could not safely identify the startup signature gate.")
+          guard_start = smali.find(".method public final u()Z")
+          if guard_start < 0:
+              raise SystemExit("Could not find the startup signature guard method.")
+          guard_end_marker = ".end method"
+          guard_end = smali.find(guard_end_marker, guard_start)
+          if guard_end < 0:
+              raise SystemExit("Could not find the end of the startup guard method.")
+          guard_body_end = guard_end + len(guard_end_marker)
+          guard_body = smali[guard_start:guard_body_end]
+          if ("AndBridge;->isSignatureValid()Z" not in guard_body
+              or "https://github.com/23fpsz/SpotiDuck-Releases" not in guard_body):
+              raise SystemExit("Startup guard did not match the expected signature check.")
           bypass = """.method public final u()Z
               .locals 1
 
@@ -127,7 +130,7 @@ jobs:
 
               return v0
           .end method"""
-          smali = guard_pattern.sub(lambda _: bypass, smali, count=1)
+          smali = smali[:guard_start] + bypass + smali[guard_body_end:]
           main_activity.write_text(smali, encoding="utf-8")
           print("Patched the startup signature gate for this personal build.")
 
