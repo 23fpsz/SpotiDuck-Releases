@@ -167,6 +167,10 @@ jobs:
           grep -R -n -B 16 -A 24 -E 'github.com/23fpsz/SpotiDuck-Releases|api.github.com/repos/23fpsz/SpotiDuck-Releases' decoded/smali* || true
           echo "=== Launcher and app identity in decoded manifest ==="
           grep -n -E 'manifest package=|MAIN|LAUNCHER|android:name=' decoded/AndroidManifest.xml | head -n 80 || true
+          echo "=== MainActivity method containing the GitHub navigation ==="
+          sed -n '5810,5915p' decoded/smali/com/spotiduck/music/MainActivity.smali
+          echo "=== Other code references to package name checks ==="
+          grep -R -n -E 'getPackageName|com\\.spotiduck\\.music|com.dinozucchini4.spotiduck.fast' decoded/smali/com/spotiduck/music decoded/smali 2>/dev/null | head -n 160 || true
 
       - name: Rebuild APK
         shell: bash
