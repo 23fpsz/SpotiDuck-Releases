@@ -212,7 +212,7 @@ jobs:
           node --check decoded/assets/playlist_sort.js
 
 
-      - name: Apply approved expanded widget patch (explicit metadata fields)
+      - name: Apply approved expanded widget patch (fixed field descriptor)
         shell: bash
         run: |
           set -euo pipefail
