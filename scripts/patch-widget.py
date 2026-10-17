@@ -132,21 +132,34 @@ if not any(n.get(ANDROID + 'id') == '@id/playlist_tiles_row' for n in root.iter(
     })
     defaults = ['Liked Songs', 'Made for you', 'Recently played', 'Playlists', 'Albums']
     for i, label in enumerate(defaults, 1):
-        ET.SubElement(row, 'TextView', {
+        tile = ET.SubElement(row, 'LinearLayout', {
             ANDROID + 'id': f'@id/playlist_tile_{i}',
+            ANDROID + 'orientation': 'vertical',
             ANDROID + 'layout_width': '0dp',
-            ANDROID + 'layout_height': '44dp',
+            ANDROID + 'layout_height': '48dp',
             ANDROID + 'layout_weight': '1',
             ANDROID + 'layout_marginHorizontal': '3dp',
-            ANDROID + 'padding': '3dp',
             ANDROID + 'gravity': 'center',
-            ANDROID + 'text': label,
-            ANDROID + 'textSize': '10sp',
-            ANDROID + 'textColor': '#ffffffff',
-            ANDROID + 'maxLines': '2',
-            ANDROID + 'ellipsize': 'end',
             ANDROID + 'background': '@drawable/widget_slim_background',
             ANDROID + 'contentDescription': f'Library shortcut {i}'
+        })
+        ET.SubElement(tile, 'ImageView', {
+            ANDROID + 'id': f'@id/playlist_tile_image_{i}',
+            ANDROID + 'layout_width': 'match_parent',
+            ANDROID + 'layout_height': '30dp',
+            ANDROID + 'scaleType': 'centerCrop',
+            ANDROID + 'src': '@drawable/widget_default_tile'
+        })
+        ET.SubElement(tile, 'TextView', {
+            ANDROID + 'id': f'@id/playlist_tile_label_{i}',
+            ANDROID + 'layout_width': 'match_parent',
+            ANDROID + 'layout_height': '18dp',
+            ANDROID + 'gravity': 'center',
+            ANDROID + 'text': label,
+            ANDROID + 'textSize': '9sp',
+            ANDROID + 'textColor': '#ffffffff',
+            ANDROID + 'maxLines': '1',
+            ANDROID + 'ellipsize': 'end'
         })
     children = list(widget_root)
     idx = children.index(progress)
@@ -163,6 +176,16 @@ new_ids = {
     'playlist_tile_3': '0x7f090232',
     'playlist_tile_4': '0x7f090233',
     'playlist_tile_5': '0x7f090234',
+    'playlist_tile_image_1': '0x7f090235',
+    'playlist_tile_image_2': '0x7f090236',
+    'playlist_tile_image_3': '0x7f090237',
+    'playlist_tile_image_4': '0x7f090238',
+    'playlist_tile_image_5': '0x7f090239',
+    'playlist_tile_label_1': '0x7f09023a',
+    'playlist_tile_label_2': '0x7f09023b',
+    'playlist_tile_label_3': '0x7f09023c',
+    'playlist_tile_label_4': '0x7f09023d',
+    'playlist_tile_label_5': '0x7f09023e',
 }
 public_path = ROOT / 'res/values/public.xml'
 public = public_path.read_text(encoding='utf-8')
