@@ -317,6 +317,15 @@ jobs:
           print('PASS: existing widget provider, metadata bridge, and six action routes are present.')
           print('NOTE: album art is currently processed asynchronously; runtime artwork rendering still needs device-level verification.')
           PY
+      - name: Dump patched Smali around widget metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== patched updater lines 475-505 ==="
+          nl -ba decoded/smali/com/spotiduck/music/a.smali | sed -n '475,505p'
+          echo "=== new metadata field references/declarations ==="
+          grep -n -E 'widgetPlaylist|widgetTile[1-5]' decoded/smali/com/spotiduck/music/a.smali decoded/smali/com/spotiduck/music/WebService.smali decoded/smali/com/spotiduck/music/AndBridge.smali
+
       - name: Rebuild APK
         shell: bash
         run: |
