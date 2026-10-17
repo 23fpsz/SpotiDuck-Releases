@@ -166,13 +166,9 @@ jobs:
           java -jar apktool.jar b decoded -o unsigned.apk
 
       - name: Install Android signing tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-          yes | "$SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager" --licenses >/dev/null
-          "$SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager" "platform-tools" "build-tools;36.0.0"
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;36.0.0'
 
       - name: Install Android build tools
         shell: bash
