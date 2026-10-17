@@ -121,12 +121,16 @@ jobs:
           fallback_index = bridge.find(fallback_marker, proxy_start_index)
           if fallback_index < 0:
               raise SystemExit("Could not find the normal fetch fallback after playback proxy.")
-          proxy_end_index = bridge.rfind("try {", proxy_start_index, fallback_index)
-          if proxy_end_index < 0:
+          # The normal fallback try-block is outside the special proxy if-block.
+          # Keep that block intact by splicing at the blank-line boundary directly
+          # before the fallback try-block.
+          fallback_try = bridge.rfind("try {", proxy_start_index, fallback_index)
+          if fallback_try < 0:
               raise SystemExit("Could not locate normal fetch fallback boundary.")
-          # Include the indentation preceding that try block so the splice preserves
-          # the pre-existing outer wrapper exactly.
-          proxy_end_index = bridge.rfind("\\n", proxy_start_index, proxy_end_index) + 1
+          proxy_end_index = bridge.rfind("\\n\\n", proxy_start_index, fallback_try)
+          if proxy_end_index < 0:
+              raise SystemExit("Could not locate separator before normal fetch fallback.")
+          proxy_end_index += 2
           new_proxy = """        if (strUrl && (strUrl.includes('connect-state') || strUrl.includes('melody/v1/msg'))) {
               // Foreground: let the WebView use a normal async request first. Calling
               // @JavascriptInterface nativeFetch synchronously can stall JS until
