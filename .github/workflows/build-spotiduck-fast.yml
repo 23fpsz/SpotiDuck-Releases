@@ -281,6 +281,34 @@ jobs:
           zip -q widget-source-debug.zip decoded/res/layout/widget_expanded.xml decoded/res/layout/home_widget.xml decoded/res/xml/home_widget_info.xml decoded/res/values/public.xml decoded/res/values/ids.xml decoded/smali/com/spotiduck/music/a.smali decoded/smali/com/spotiduck/music/HomeWidget.smali decoded/smali/com/spotiduck/music/AndBridge.smali 'decoded/smali/com/spotiduck/music/WebService$MediaActionReceiver.smali' decoded/smali/com/spotiduck/music/WebService.smali decoded/smali/com/squareup/picasso/Picasso.smali decoded/smali/com/squareup/picasso/RequestCreator.smali decoded/assets/spotify_bridge.js
           ls -lh widget-source-debug.zip
 
+      - name: Validate native widget metadata and controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          manifest = Path('decoded/AndroidManifest.xml').read_text(encoding='utf-8')
+          layout = Path('decoded/res/layout/widget_expanded.xml').read_text(encoding='utf-8')
+          bridge = Path('decoded/assets/spotify_bridge.js').read_text(encoding='utf-8')
+          updater = Path('decoded/smali/com/spotiduck/music/a.smali').read_text(encoding='utf-8')
+          required_manifest = ['com.spotiduck.music.HomeWidget', 'android.appwidget.action.APPWIDGET_UPDATE']
+          required_layout = ['@id/txt_title', '@id/txt_artist', '@id/img_cover', '@id/btn_shuffle', '@id/btn_prev', '@id/btn_play', '@id/btn_next', '@id/btn_repeat', '@id/btn_fav']
+          required_controls = ['WIDGET_NEXT', 'WIDGET_PREV', 'WIDGET_PLAYPAUSE', 'REPEAT_ACTION', 'SHUFFLE_ACTION', 'ADDTOFAV_ACTION']
+          for text in required_manifest:
+              if text not in manifest: raise SystemExit('Missing widget registration: ' + text)
+          for text in required_layout:
+              if text not in layout: raise SystemExit('Missing widget UI control: ' + text)
+          for text in required_controls:
+              if text not in updater: raise SystemExit('Missing native pending-intent route: ' + text)
+          if 'AndBridge.recMediaStatus(JSON.stringify(values))' not in bridge:
+              raise SystemExit('Expected JS-to-native metadata contract not found')
+          media_fields = ['track:', 'artist:', 'cover:', 'duration:', 'position:']
+          for text in media_fields:
+              if text not in bridge: raise SystemExit('Missing metadata field: ' + text)
+          print('PASS: existing widget provider, metadata bridge, and six action routes are present.')
+          print('NOTE: album art is currently processed asynchronously; runtime artwork rendering still needs device-level verification.')
+          PY
       - name: Rebuild APK
         shell: bash
         run: |
