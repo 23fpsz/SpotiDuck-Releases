@@ -257,6 +257,26 @@ jobs:
           echo "=== Other code references to package name checks ==="
           grep -R -n -E 'getPackageName|com\\.spotiduck\\.music|com.dinozucchini4.spotiduck.fast' decoded/smali/com/spotiduck/music decoded/smali 2>/dev/null | head -n 160 || true
 
+      - name: Inspect decoded native widget implementation (experimental)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Native widget-related decoded source files ==="
+          find decoded/smali* decoded/res -type f \\
+            \( -iname '*HomeWidget*' -o -iname '*widget*' -o -iname '*MediaActionReceiver*' \) \\
+            | sort | head -n 160
+          echo "=== Widget provider/receiver registration in manifest ==="
+          grep -n -B 8 -A 18 -E 'HomeWidget|APPWIDGET_UPDATE|home_widget_info|MediaActionReceiver' decoded/AndroidManifest.xml || true
+          echo "=== Decoded widget metadata ==="
+          for f in decoded/res/xml/home_widget_info.xml decoded/res/layout/home_widget.xml decoded/res/layout/widget_expanded.xml; do
+            if [ -f "$f" ]; then echo "--- $f"; sed -n '1,260p' "$f"; fi
+          done
+          echo "=== HomeWidget and media control handlers ==="
+          find decoded/smali* -type f \\
+            \( -name 'HomeWidget.smali' -o -name 'WebService$MediaActionReceiver.smali' -o -name 'WebService.smali' \) \\
+            -print -exec sed -n '1,320p' {} \\
+            \; 2>/dev/null | head -n 1800
+
       - name: Rebuild APK
         shell: bash
         run: |
