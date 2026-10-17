@@ -24,3 +24,12 @@ This releases repository contains release artifacts and a workflow that decodes/
 
 ## Performance constraints
 Retain the performance changes from `fast-performance-build`. Do not redesign the widget or change the main branch.
+
+
+## Source investigation (2026-10-17)
+- Reviewed the public `Mirox921/SpotiPuk` source tree as a possible native reference.
+- It has a full Kotlin/Gradle Android app and a MediaSession-backed notification service. Its JavaScript bridge reports track, artist, playback status and position to that service; transport controls are dispatched back into its own WebView.
+- It is **not a drop-in source tree for SpotiDuck**: it uses a different application ID/package, different app architecture, and a first-launch CA-certificate setup. Replacing SpotiDuck with it would not preserve the current SpotiDuck build or its existing performance patches.
+- No widget provider/receiver was found in the inspected source tree. The requested widget would still need a new native AppWidget implementation and an explicit, tested control/metadata path.
+- Decision: use the project only as a technical reference for MediaSession integration, not as a wholesale replacement. Continue investigating the original SpotiDuck bridge and keep the existing APK/performance branch intact.
+- Verification rule: a successful APK rebuild alone is not proof that the widget works or that playback stalls are fixed. Test widget metadata/control actions and slow-network playback separately before describing either as complete.
