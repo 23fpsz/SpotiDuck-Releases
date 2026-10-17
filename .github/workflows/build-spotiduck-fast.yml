@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fast-performance-build
+      - widget-design-experiment
     paths:
       - .github/workflows/build-spotiduck-fast.yml
   workflow_dispatch:
