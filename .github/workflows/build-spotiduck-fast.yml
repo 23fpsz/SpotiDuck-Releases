@@ -197,6 +197,15 @@ jobs:
           grep -n -E 'manifest package=|MAIN|LAUNCHER|android:name=' decoded/AndroidManifest.xml | head -n 80 || true
           echo "=== MainActivity method containing the GitHub navigation ==="
           sed -n '5810,5915p' decoded/smali/com/spotiduck/music/MainActivity.smali
+          echo "=== Native fetch bridge implementation ==="
+          FETCH_SMALI="decoded/smali/com/spotiduck/music/AndBridge.smali"
+          grep -n -E 'nativeFetch|HttpURLConnection|URL;->openConnection|connect-state' "$FETCH_SMALI" | head -n 120 || true
+          FETCH_LINE="$(grep -n 'nativeFetch' "$FETCH_SMALI" | head -n 1 | cut -d: -f1 || true)"
+          if [ -n "$FETCH_LINE" ]; then
+            FETCH_START=$((FETCH_LINE > 10 ? FETCH_LINE - 10 : 1))
+            FETCH_END=$((FETCH_LINE + 180))
+            sed -n "${FETCH_START},${FETCH_END}p" "$FETCH_SMALI"
+          fi
           echo "=== Other code references to package name checks ==="
           grep -R -n -E 'getPackageName|com\\.spotiduck\\.music|com.dinozucchini4.spotiduck.fast' decoded/smali/com/spotiduck/music decoded/smali 2>/dev/null | head -n 160 || true
 
