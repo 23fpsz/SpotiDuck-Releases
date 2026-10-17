@@ -1,0 +1,198 @@
+name: Build SpotiDuck Fast (experimental)
+
+on:
+  push:
+    branches:
+      - fast-performance-build
+    paths:
+      - .github/workflows/build-spotiduck-fast.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-fast-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out performance-build branch
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download exact official APK and Apktool
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output original.apk \
+            https://github.com/23fpsz/SpotiDuck-Releases/releases/download/latest-beta/SpotiDuck-v1.2.2-3d2c473.apk
+          echo "56c1a719f4857dcb1856606543db000fc87856390624242a02480a1ba28c8014  original.apk" | sha256sum --check -
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output apktool.jar \
+            https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar
+
+      - name: Decode APK and apply performance changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -jar apktool.jar d -f original.apk -o decoded
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import xml.etree.ElementTree as ET
+
+          asset = Path("decoded/assets/playlist_sort.js")
+          source = asset.read_text(encoding="utf-8")
+
+          old_sort = """        return items.slice().sort(function(a, b) {
+                      var x = valueOf(a, field), y = valueOf(b, field);
+                      if (x === null && y === null) return 0;
+                      if (x === null) return 1;
+                      if (y === null) return -1;
+                      if (typeof x === 'string' || typeof y === 'string') {
+                          return String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+                      }
+                      if (x === y) return 0;
+                      return (x < y ? -1 : 1) * dir;
+                  });"""
+          new_sort = """        // Cache keys once rather than recomputing them inside every comparator.
+                  var keyed = items.map(function(item, index) {
+                      return { item: item, index: index, key: valueOf(item, field) };
+                  });
+                  keyed.sort(function(a, b) {
+                      var x = a.key, y = b.key;
+                      if (x === null && y === null) return a.index - b.index;
+                      if (x === null) return 1;
+                      if (y === null) return -1;
+                      if (typeof x === 'string' || typeof y === 'string') {
+                          var result = String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+                          return result || (a.index - b.index);
+                      }
+                      if (x === y) return a.index - b.index;
+                      return (x < y ? -1 : 1) * dir;
+                  });
+                  return keyed.map(function(entry) { return entry.item; });"""
+
+          # Match only the specific sorter block and fail loudly if the asset changed.
+          pattern = re.compile(
+              r"        return items\.slice\(\)\.sort\(function\(a, b\) \{.*?^        \}\);",
+              re.MULTILINE | re.DOTALL,
+          )
+          source, sort_count = pattern.subn(lambda _: new_sort, source, count=1)
+          if sort_count != 1:
+              raise SystemExit("Could not safely locate the original sort comparator.")
+
+          replacements = [
+              ("var stack = [fiber], seen = [], guard = 0;",
+               "var stack = [fiber], seen = new WeakSet(), guard = 0;"),
+              ("if (!node || seen.indexOf(node) !== -1) continue;",
+               "if (!node || seen.has(node)) continue;"),
+              ("seen.push(node);", "seen.add(node);"),
+              ("setInterval(attachSortButton, 1000);",
+               "// MutationObserver handles normal SPA updates; this slower poll is a fallback.\n    setInterval(attachSortButton, 5000);"),
+          ]
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit("Expected exactly one match for optimization: " + old)
+              source = source.replace(old, new, 1)
+
+          asset.write_text(source, encoding="utf-8")
+          print("Applied 4 guarded playlist-sort optimizations.")
+
+          # Rename the package ID so this build installs beside the official app.
+          manifest_path = Path("decoded/AndroidManifest.xml")
+          android_ns = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android_ns)
+          ET.register_namespace("tools", "http://schemas.android.com/tools")
+          ET.register_namespace("dist", "http://schemas.android.com/apk/distribution")
+          key_name = "{" + android_ns + "}name"
+          key_target = "{" + android_ns + "}targetActivity"
+          key_authorities = "{" + android_ns + "}authorities"
+          key_permission = "{" + android_ns + "}permission"
+          key_read_permission = "{" + android_ns + "}readPermission"
+          key_write_permission = "{" + android_ns + "}writePermission"
+          key_affinity = "{" + android_ns + "}taskAffinity"
+          tree = ET.parse(manifest_path)
+          root = tree.getroot()
+          old_package = root.get("package")
+          new_package = "com.dinozucchini4.spotiduck.fast"
+          if not old_package:
+              raise SystemExit("Manifest package was not present; refusing unsafe package rename.")
+          root.set("package", new_package)
+
+          component_tags = {"application", "activity", "activity-alias", "service", "receiver", "provider", "instrumentation"}
+          permission_tags = {"permission", "permission-group", "permission-tree", "uses-permission", "uses-permission-sdk-23", "uses-permission-sdk-m"}
+          for element in root.iter():
+              tag = element.tag.split("}")[-1]
+              if tag in component_tags:
+                  for attr in (key_name, key_target):
+                      value = element.get(attr)
+                      if value:
+                          if value.startswith("."):
+                              value = old_package + value
+                          elif "." not in value:
+                              value = old_package + "." + value
+                          element.set(attr, value)
+              elif tag in permission_tags:
+                  value = element.get(key_name)
+                  if value and (value == old_package or value.startswith(old_package + ".")):
+                      element.set(key_name, new_package + value[len(old_package):])
+
+              for attr in (key_authorities, key_permission, key_read_permission, key_write_permission, key_affinity):
+                  value = element.get(attr)
+                  if value and old_package in value:
+                      element.set(attr, value.replace(old_package, new_package))
+
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("No application node found in manifest.")
+          app.set("{" + android_ns + "}label", "SpotiDuck Fast")
+          tree.write(manifest_path, encoding="utf-8", xml_declaration=True)
+          print("Renamed package from %s to %s." % (old_package, new_package))
+          PY
+          node --check decoded/assets/playlist_sort.js
+
+      - name: Rebuild APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -jar apktool.jar b decoded -o unsigned.apk
+
+      - name: Install Android signing tools
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "build-tools;36.0.0"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/apksigner"
+
+      - name: Align and sign the custom app
+        shell: bash
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          "$BT/zipalign" -f -p 4 unsigned.apk aligned.apk
+          keytool -genkeypair -noprompt -keystore fast-build.keystore -storepass android -keypass android -alias spotiduck-fast -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=SpotiDuck Fast Local Build"
+          "$BT/apksigner" sign --ks fast-build.keystore --ks-key-alias spotiduck-fast --ks-pass pass:android --key-pass pass:android --out SpotiDuck-Fast.apk aligned.apk
+          "$BT/apksigner" verify --verbose SpotiDuck-Fast.apk
+          "$BT/aapt" dump badging SpotiDuck-Fast.apk | head -n 5
+          sha256sum SpotiDuck-Fast.apk
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpotiDuck-Fast-experimental-APK
+          path: SpotiDuck-Fast.apk
+          if-no-files-found: error
+          retention-days: 14
