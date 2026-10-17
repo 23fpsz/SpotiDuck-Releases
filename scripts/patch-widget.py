@@ -168,13 +168,13 @@ public_path = ROOT / 'res/values/public.xml'
 public = public_path.read_text(encoding='utf-8')
 for name, value in new_ids.items():
     if f'name="{name}"' not in public:
-        public = public.replace('</resources>', f'    <public type="id" name="{name}" id="{value}" />\\n</resources>', 1)
+        public = public.replace('</resources>', f'    <public type="id" name="{name}" id="{value}" />\n</resources>', 1)
 public_path.write_text(public, encoding='utf-8')
 ids_path = ROOT / 'res/values/ids.xml'
 ids_text = ids_path.read_text(encoding='utf-8')
 for name in new_ids:
     if f'name="{name}"' not in ids_text:
-        ids_text = ids_text.replace('</resources>', f'    <item type="id" name="{name}" />\\n</resources>', 1)
+        ids_text = ids_text.replace('</resources>', f'    <item type="id" name="{name}" />\n</resources>', 1)
 ids_path.write_text(ids_text, encoding='utf-8')
 
 # 4) Add data slots to the native media state. The widget updater can now render
@@ -258,7 +258,7 @@ widget_builder_path = ROOT / 'smali/com/spotiduck/music/a.smali'
 widget_builder = widget_builder_path.read_text(encoding='utf-8')
 pattern_pair = re.compile(
     r"    sget-object v10, Lcom/spotiduck/music/WebService;->v:Ljava/lang/String;.*?"
-    r"    invoke-virtual \\{v7, v9, v10\\}, Landroid/widget/RemoteViews;->setTextViewText\\(ILjava/lang/CharSequence;\\)V",
+    r"    invoke-virtual \{v7, v9, v10\}, Landroid/widget/RemoteViews;->setTextViewText\(ILjava/lang/CharSequence;\)V",
     re.DOTALL,
 )
 new_pair = '''    sget-object v10, Lcom/spotiduck/music/WebService;->v:Ljava/lang/String;
@@ -286,7 +286,7 @@ if pair_count != 1:
 
 # Set the five shortcut captions in expanded-mode RemoteViews.
 click_pattern = re.compile(
-    r"    invoke-virtual \\{v7, v13, v0\\}, Landroid/widget/RemoteViews;->setOnClickPendingIntent\\(ILandroid/app/PendingIntent;\\)V.*?    goto :goto_e",
+    r"    invoke-virtual \{v7, v13, v0\}, Landroid/widget/RemoteViews;->setOnClickPendingIntent\(ILandroid/app/PendingIntent;\)V.*?    goto :goto_e",
     re.DOTALL,
 )
 click_insert = '''    invoke-virtual {v7, v13, v0}, Landroid/widget/RemoteViews;->setOnClickPendingIntent(ILandroid/app/PendingIntent;)V
