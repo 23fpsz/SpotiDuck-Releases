@@ -274,6 +274,13 @@ jobs:
             echo "--- $f"; sed -n '1,320p' "$f";
           done | head -n 1800
 
+      - name: Package widget source for inspection
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip -q widget-source-debug.zip decoded/res/layout/widget_expanded.xml decoded/res/layout/home_widget.xml decoded/res/xml/home_widget_info.xml decoded/smali/com/spotiduck/music/a.smali decoded/smali/com/spotiduck/music/HomeWidget.smali 'decoded/smali/com/spotiduck/music/WebService$MediaActionReceiver.smali' decoded/smali/com/spotiduck/music/WebService.smali
+          ls -lh widget-source-debug.zip
+
       - name: Rebuild APK
         shell: bash
         run: |
