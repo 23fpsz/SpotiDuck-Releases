@@ -137,9 +137,78 @@ jobs:
           node --check decoded/assets/playlist_sort.js
           node --check decoded/assets/spotify_bridge.js
 
-          # This app intentionally opens its GitHub page and exits when the APK is
-          # not signed by the developer's private key. This personal, separately
-          # signed build must pass that one launcher gate to run.
+          # Patch the personal-build startup gate and keep this build installed beside
+          # the official app. Without this step, the app redirects to the source repo.
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          main_activity = Path("decoded/smali/com/spotiduck/music/MainActivity.smali")
+          smali = main_activity.read_text(encoding="utf-8")
+          guard_start = smali.find(".method public final u()Z")
+          if guard_start < 0:
+              raise SystemExit("Could not find startup signature guard method.")
+          guard_end = smali.find(".end method", guard_start)
+          if guard_end < 0:
+              raise SystemExit("Could not find end of startup signature guard method.")
+          guard_end += len(".end method")
+          guard_body = smali[guard_start:guard_end]
+          if "AndBridge;->isSignatureValid()Z" not in guard_body:
+              raise SystemExit("Startup method did not match expected signature gate; refusing to patch.")
+          replacement = ".method public final u()Z\\n    .locals 1\\n\\n    const/4 v0, 0x1\\n\\n    return v0\\n.end method"
+          smali = smali[:guard_start] + replacement + smali[guard_end:]
+          main_activity.write_text(smali, encoding="utf-8")
+          print("Patched the startup signature gate for this separately signed personal build.")
+
+          manifest_path = Path("decoded/AndroidManifest.xml")
+          android_ns = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android_ns)
+          ET.register_namespace("tools", "http://schemas.android.com/tools")
+          ET.register_namespace("dist", "http://schemas.android.com/apk/distribution")
+          key_name = "{" + android_ns + "}name"
+          key_target = "{" + android_ns + "}targetActivity"
+          key_authorities = "{" + android_ns + "}authorities"
+          key_permission = "{" + android_ns + "}permission"
+          key_read_permission = "{" + android_ns + "}readPermission"
+          key_write_permission = "{" + android_ns + "}writePermission"
+          key_affinity = "{" + android_ns + "}taskAffinity"
+          tree = ET.parse(manifest_path)
+          root = tree.getroot()
+          old_package = root.get("package")
+          new_package = "com.dinozucchini4.spotiduck.fast"
+          if not old_package:
+              raise SystemExit("Manifest package missing; refusing unsafe rename.")
+          root.set("package", new_package)
+          component_tags = {"application", "activity", "activity-alias", "service", "receiver", "provider", "instrumentation"}
+          permission_tags = {"permission", "permission-group", "permission-tree", "uses-permission", "uses-permission-sdk-23", "uses-permission-sdk-m"}
+          for element in root.iter():
+              tag = element.tag.split("}")[-1]
+              if tag in component_tags:
+                  for attr in (key_name, key_target):
+                      value = element.get(attr)
+                      if value:
+                          if value.startswith("."):
+                              value = old_package + value
+                          elif "." not in value:
+                              value = old_package + "." + value
+                          element.set(attr, value)
+              elif tag in permission_tags:
+                  value = element.get(key_name)
+                  if value and (value == old_package or value.startswith(old_package + ".")):
+                      element.set(key_name, new_package + value[len(old_package):])
+              for attr in (key_authorities, key_permission, key_read_permission, key_write_permission, key_affinity):
+                  value = element.get(attr)
+                  if value and old_package in value:
+                      element.set(attr, value.replace(old_package, new_package))
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("Manifest application node missing.")
+          app.set(key_name, "SpotiDuck Fast")
+          tree.write(manifest_path, encoding="utf-8", xml_declaration=True)
+          print("Renamed application package from %s to %s." % (old_package, new_package))
+          PY
+          node --check decoded/assets/playlist_sort.js
+
 
       - name: Diagnose GitHub redirect handling
         shell: bash
