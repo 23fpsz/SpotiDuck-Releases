@@ -159,6 +159,15 @@ jobs:
           PY
           node --check decoded/assets/playlist_sort.js
 
+      - name: Diagnose GitHub redirect handling
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== References to the official repository URL in decoded Android code ==="
+          grep -R -n -B 16 -A 24 -E 'github.com/23fpsz/SpotiDuck-Releases|api.github.com/repos/23fpsz/SpotiDuck-Releases' decoded/smali* || true
+          echo "=== Launcher and app identity in decoded manifest ==="
+          grep -n -E 'manifest package=|MAIN|LAUNCHER|android:name=' decoded/AndroidManifest.xml | head -n 80 || true
+
       - name: Rebuild APK
         shell: bash
         run: |
