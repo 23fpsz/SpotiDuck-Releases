@@ -174,7 +174,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null
           sdkmanager "build-tools;36.0.0"
           test -x "$ANDROID_HOME/build-tools/36.0.0/zipalign"
           test -x "$ANDROID_HOME/build-tools/36.0.0/apksigner"
