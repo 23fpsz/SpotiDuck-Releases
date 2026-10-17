@@ -339,7 +339,10 @@ widget_builder_path.write_text(widget_builder, encoding='utf-8')
 # Structural checks before rebuilding.
 layout = ET.parse(layout_path).getroot()
 layout_ids = [node.get(ANDROID + 'id') for node in layout.iter()]
-for name in ['playlist_tiles_row'] + [f'playlist_tile_{i}' for i in range(1, 6)]:
+required_tile_ids = ['playlist_tiles_row'] + [f'playlist_tile_{i}' for i in range(1, 6)]
+required_tile_ids += [f'playlist_tile_image_{i}' for i in range(1, 6)]
+required_tile_ids += [f'playlist_tile_label_{i}' for i in range(1, 6)]
+for name in required_tile_ids:
     if layout_ids.count('@id/' + name) != 1:
         raise SystemExit('New widget ID missing or duplicated: ' + name)
 for token in ['tile1:', 'tile2:', 'tile3:', 'tile4:', 'tile5:', 'playlist: playlistName']:
