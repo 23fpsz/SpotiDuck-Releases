@@ -106,6 +106,31 @@ jobs:
           asset.write_text(source, encoding="utf-8")
           print("Applied 4 guarded playlist-sort optimizations.")
 
+          # This app intentionally opens its GitHub page and exits when the APK is
+          # not signed by the developer's private key. This personal, separately
+          # signed build must pass that one launcher gate to run.
+          main_activity = Path("decoded/smali/com/spotiduck/music/MainActivity.smali")
+          smali = main_activity.read_text(encoding="utf-8")
+          guard_pattern = re.compile(
+              r"^\.method public final u\(\)Z\\n.*?^\.end method",
+              re.MULTILINE | re.DOTALL,
+          )
+          guard_match = guard_pattern.search(smali)
+          if (not guard_match
+              or "AndBridge;->isSignatureValid()Z" not in guard_match.group(0)
+              or "https://github.com/23fpsz/SpotiDuck-Releases" not in guard_match.group(0)):
+              raise SystemExit("Could not safely identify the startup signature gate.")
+          bypass = """.method public final u()Z
+              .locals 1
+
+              const/4 v0, 0x1
+
+              return v0
+          .end method"""
+          smali = guard_pattern.sub(lambda _: bypass, smali, count=1)
+          main_activity.write_text(smali, encoding="utf-8")
+          print("Patched the startup signature gate for this personal build.")
+
           # Rename the package ID so this build installs beside the official app.
           manifest_path = Path("decoded/AndroidManifest.xml")
           android_ns = "http://schemas.android.com/apk/res/android"
