@@ -277,7 +277,7 @@ new_pair = '''    sget-object v10, Lcom/spotiduck/music/WebService;->v:Ljava/lan
 
     invoke-virtual {v7, v11, v10}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
 
-    sget-object v10, Lcom/spotiduck/music/WebService;->H:Ljava/lang/String
+    sget-object v10, Lcom/spotiduck/music/WebService;->widgetPlaylist:Ljava/lang/String;
 
     invoke-virtual {v7, v9, v10}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V'''
 widget_builder, pair_count = pattern_pair.subn(lambda _: new_pair, widget_builder, count=1)
