@@ -41,11 +41,12 @@ new_state = '''        const playlistName = (() => {
             return '';
         })();
         const mediaLib = window.mediaLib || {};
-        const tileItems = [...(mediaLib.playlists || []), ...(mediaLib.albums || [])]
-            .filter(item => item && item.name && item.id)
-            .slice(0, 5);
-        const defaultTileNames = ['Liked Songs', 'Made for you', 'Recently played', 'Playlists', 'Albums'];
+        const playlistItems = (mediaLib.playlists || []).filter(item => item && item.name && item.id);
+        const albumItems = (mediaLib.albums || []).filter(item => item && item.name && item.id);
+        const tileItems = [...playlistItems.slice(0, 3), ...albumItems.slice(0, 2)];
+        const defaultTileNames = ['Liked Songs', 'Playlists', 'Made for you', 'Recently played', 'Albums'];
         const tileNames = Array.from({length: 5}, (_, i) => tileItems[i]?.name || defaultTileNames[i]);
+        const tileImages = Array.from({length: 5}, (_, i) => tileItems[i]?.image || '');
         const currState = [
             window.track || "",
             window.artist || "",
@@ -70,6 +71,11 @@ new_values = '''                cover: window.cover || "",
                 tile3: tileNames[2],
                 tile4: tileNames[3],
                 tile5: tileNames[4],
+                tileImage1: tileImages[0],
+                tileImage2: tileImages[1],
+                tileImage3: tileImages[2],
+                tileImage4: tileImages[3],
+                tileImage5: tileImages[4],
                 duration: window.duration || 0,
                 position: window.position || 0'''
 if bridge.count(old_values) != 1:
