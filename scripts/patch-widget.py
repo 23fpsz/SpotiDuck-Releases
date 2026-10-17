@@ -182,12 +182,12 @@ ids_path.write_text(ids_text, encoding='utf-8')
 service_path = ROOT / 'smali/com/spotiduck/music/WebService.smali'
 service = service_path.read_text(encoding='utf-8')
 field_anchor = '.field public static r:Z = false'
-fields = '''.field public static H:Ljava/lang/String; = ""
-.field public static I:Ljava/lang/String; = "Liked Songs"
-.field public static J:Ljava/lang/String; = "Made for you"
-.field public static K:Ljava/lang/String; = "Recently played"
-.field public static L:Ljava/lang/String; = "Playlists"
-.field public static M:Ljava/lang/String; = "Albums"
+fields = '''.field public static widgetPlaylist:Ljava/lang/String; = ""
+.field public static widgetTile1:Ljava/lang/String; = "Liked Songs"
+.field public static widgetTile2:Ljava/lang/String; = "Made for you"
+.field public static widgetTile3:Ljava/lang/String; = "Recently played"
+.field public static widgetTile4:Ljava/lang/String; = "Playlists"
+.field public static widgetTile5:Ljava/lang/String; = "Albums"
 
 '''
 if service.count(field_anchor) != 1:
@@ -204,7 +204,7 @@ insert = '''    const-string p1, "playlist"
 
     move-result-object p1
 
-    sput-object p1, Lcom/spotiduck/music/WebService;->H:Ljava/lang/String;
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetPlaylist:Ljava/lang/String;
 
     const-string p1, "tile1"
 
@@ -212,7 +212,7 @@ insert = '''    const-string p1, "playlist"
 
     move-result-object p1
 
-    sput-object p1, Lcom/spotiduck/music/WebService;->I:Ljava/lang/String;
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTile1:Ljava/lang/String;
 
     const-string p1, "tile2"
 
@@ -220,7 +220,7 @@ insert = '''    const-string p1, "playlist"
 
     move-result-object p1
 
-    sput-object p1, Lcom/spotiduck/music/WebService;->J:Ljava/lang/String;
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTile2:Ljava/lang/String;
 
     const-string p1, "tile3"
 
@@ -228,7 +228,7 @@ insert = '''    const-string p1, "playlist"
 
     move-result-object p1
 
-    sput-object p1, Lcom/spotiduck/music/WebService;->K:Ljava/lang/String;
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTile3:Ljava/lang/String;
 
     const-string p1, "tile4"
 
@@ -236,7 +236,7 @@ insert = '''    const-string p1, "playlist"
 
     move-result-object p1
 
-    sput-object p1, Lcom/spotiduck/music/WebService;->L:Ljava/lang/String;
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTile4:Ljava/lang/String;
 
     const-string p1, "tile5"
 
@@ -244,7 +244,7 @@ insert = '''    const-string p1, "playlist"
 
     move-result-object p1
 
-    sput-object p1, Lcom/spotiduck/music/WebService;->M:Ljava/lang/String;
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTile5:Ljava/lang/String;
 
     const-string p1, "cover"'''
 if smali.count(anchor) != 1:
@@ -291,19 +291,19 @@ click_pattern = re.compile(
 )
 click_insert = '''    invoke-virtual {v7, v13, v0}, Landroid/widget/RemoteViews;->setOnClickPendingIntent(ILandroid/app/PendingIntent;)V
 
-    sget-object v4, Lcom/spotiduck/music/WebService;->I:Ljava/lang/String;
+    sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile1:Ljava/lang/String;
     const v5, 0x7f090230
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
-    sget-object v4, Lcom/spotiduck/music/WebService;->J:Ljava/lang/String;
+    sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile2:Ljava/lang/String;
     const v5, 0x7f090231
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
-    sget-object v4, Lcom/spotiduck/music/WebService;->K:Ljava/lang/String;
+    sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile3:Ljava/lang/String;
     const v5, 0x7f090232
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
-    sget-object v4, Lcom/spotiduck/music/WebService;->L:Ljava/lang/String;
+    sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile4:Ljava/lang/String;
     const v5, 0x7f090233
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
-    sget-object v4, Lcom/spotiduck/music/WebService;->M:Ljava/lang/String;
+    sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile5:Ljava/lang/String;
     const v5, 0x7f090234
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
 
