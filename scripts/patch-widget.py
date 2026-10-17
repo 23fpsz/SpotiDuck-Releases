@@ -192,6 +192,7 @@ new_ids = {
     'playlist_tile_label_3': '0x7f09023c',
     'playlist_tile_label_4': '0x7f09023d',
     'playlist_tile_label_5': '0x7f09023e',
+    'txt_playlist': '0x7f09023f',
 }
 public_path = ROOT / 'res/values/public.xml'
 public = public_path.read_text(encoding='utf-8')
@@ -307,6 +308,8 @@ new_pair = '''    sget-object v10, Lcom/spotiduck/music/WebService;->v:Ljava/lan
     invoke-virtual {v7, v11, v10}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
 
     sget-object v10, Lcom/spotiduck/music/WebService;->widgetPlaylist:Ljava/lang/String;
+
+    const v9, 0x7f09023f
 
     invoke-virtual {v7, v9, v10}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V'''
 widget_builder, pair_count = pattern_pair.subn(lambda _: new_pair, widget_builder, count=1)
