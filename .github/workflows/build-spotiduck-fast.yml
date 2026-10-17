@@ -212,6 +212,14 @@ jobs:
           node --check decoded/assets/playlist_sort.js
 
 
+      - name: Apply approved expanded widget patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch-widget.py
+          node --check decoded/assets/spotify_bridge.js
+          echo "Applied native expanded-widget metadata and shortcut labels."
+
       - name: Inspect the existing native widget safely
         shell: bash
         run: |
