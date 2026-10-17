@@ -121,16 +121,43 @@ jobs:
           fallback_index = bridge.find(fallback_marker, proxy_start_index)
           if fallback_index < 0:
               raise SystemExit("Could not find the normal fetch fallback after playback proxy.")
-          # The normal fallback try-block is outside the special proxy if-block.
-          # Keep that block intact by splicing at the blank-line boundary directly
-          # before the fallback try-block.
-          fallback_try = bridge.rfind("try {", proxy_start_index, fallback_index)
-          if fallback_try < 0:
-              raise SystemExit("Could not locate normal fetch fallback boundary.")
-          proxy_end_index = bridge.rfind("\\n\\n", proxy_start_index, fallback_try)
+          # Find the matching closing brace for the special proxy if-statement.
+          # Brace counting avoids assumptions about indentation or blank lines.
+          open_brace = bridge.find("{", proxy_start_index)
+          if open_brace < 0:
+              raise SystemExit("Could not locate opening brace for playback proxy.")
+          depth = 0
+          in_single = in_double = in_template = False
+          escaped = False
+          proxy_end_index = -1
+          for i in range(open_brace, len(bridge)):
+              ch = bridge[i]
+              if escaped:
+                  escaped = False
+                  continue
+              if ch == "\\\\":
+                  escaped = True
+                  continue
+              if not in_double and not in_template and ch == "'":
+                  in_single = not in_single
+                  continue
+              if not in_single and not in_template and ch == '"':
+                  in_double = not in_double
+                  continue
+              if not in_single and not in_double and ch == "`":
+                  in_template = not in_template
+                  continue
+              if in_single or in_double or in_template:
+                  continue
+              if ch == "{":
+                  depth += 1
+              elif ch == "}":
+                  depth -= 1
+                  if depth == 0:
+                      proxy_end_index = i + 1
+                      break
           if proxy_end_index < 0:
-              raise SystemExit("Could not locate separator before normal fetch fallback.")
-          proxy_end_index += 2
+              raise SystemExit("Could not match closing brace for playback proxy.")
           new_proxy = """        if (strUrl && (strUrl.includes('connect-state') || strUrl.includes('melody/v1/msg'))) {
               // Foreground: let the WebView use a normal async request first. Calling
               // @JavascriptInterface nativeFetch synchronously can stall JS until
