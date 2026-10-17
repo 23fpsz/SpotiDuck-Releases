@@ -106,6 +106,99 @@ jobs:
           asset.write_text(source, encoding="utf-8")
           print("Applied 4 guarded playlist-sort optimizations.")
 
+          # Reduce foreground control latency: prefer Chromium's asynchronous fetch
+          # while the player is visible; retain native proxy fallback for CORS and
+          # background playback compatibility.
+          bridge_path = Path("decoded/assets/spotify_bridge.js")
+          bridge = bridge_path.read_text(encoding="utf-8")
+          proxy_start = "        if (strUrl && (strUrl.includes('connect-state') || strUrl.includes('melody/v1/msg'))) {"
+          proxy_end_marker = "\n\n        try:\n            const resp = await oriFetch(url, opts);"
+          proxy_start_index = bridge.find(proxy_start)
+          if proxy_start_index < 0:
+              raise SystemExit("Could not find playback network proxy block.")
+          proxy_end_index = bridge.find(proxy_end_marker, proxy_start_index)
+          if proxy_end_index < 0:
+              raise SystemExit("Could not locate the end of playback network proxy block.")
+          new_proxy = """        if (strUrl && (strUrl.includes('connect-state') || strUrl.includes('melody/v1/msg'))) {
+              // Foreground: let the WebView use a normal async request first. Calling
+              // @JavascriptInterface nativeFetch synchronously can stall JS until
+              // HttpURLConnection finishes its network request (up to 10 seconds).
+              if (document.visibilityState === 'visible') {
+                  try {
+                      const asyncResponse = await oriFetch(url, opts);
+                      if (asyncResponse.status === 404 &&
+                          strUrl.includes('connect-state') &&
+                          strUrl.includes('/command/from/')) {
+                          AndBridge.deferMessage('reload');
+                          location.reload();
+                      }
+                      return asyncResponse;
+                  } catch (asyncError) {
+                      // Some WebView/network combinations may reject the cross-origin
+                      // request. Fall back to the existing native route in that case.
+                      console.debug('[SpotiDuck] Async foreground request failed; using native fallback.', asyncError);
+                  }
+              }
+
+              // Keep the native route for background playback and as a foreground
+              // fallback. This preserves the existing behavior where async fetch fails.
+              try {
+                  const reqHeaders = opts?.headers || {};
+                  const reqBody = opts?.body ? (typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body)) : null;
+                  const rawRes = AndBridge.nativeFetch(strUrl, method, JSON.stringify(reqHeaders), reqBody);
+                  if (rawRes) {
+                      const parsed = JSON.parse(rawRes);
+                      const status = parsed.status || 200;
+                      const resBody = parsed.body || '';
+                      return {
+                          ok: status >= 200 && status < 300,
+                          status: status,
+                          statusText: status === 200 ? 'OK' : '',
+                          headers: new Headers(parsed.headers || {}),
+                          url: strUrl,
+                          json: async () => JSON.parse(resBody || '{}'),
+                          text: async () => resBody,
+                          arrayBuffer: async () => new TextEncoder().encode(resBody).buffer,
+                          clone: function() { return this; }
+                      };
+                  }
+              } catch (e) {
+                  console.error('[Spotifuck] Proxy nativeFetch error:', e);
+              }
+          }""";
+          if ("AndBridge.nativeFetch" not in bridge[proxy_start_index:proxy_end_index]):
+              raise SystemExit("The located playback proxy does not contain the expected native call.")
+          bridge = bridge[:proxy_start_index] + new_proxy + bridge[proxy_end_index:]
+
+          # Avoid repeated layout-forcing innerText reads and scanning nested spans
+          # every time Spotify inserts a DOM subtree.
+          observer_selector = 'node.querySelectorAll("button, a, span").forEach(el => {'
+          if bridge.count(observer_selector) != 1:
+              raise SystemExit("Could not uniquely locate the global DOM text scan.")
+          bridge = bridge.replace(observer_selector, 'node.querySelectorAll("button, a").forEach(el => {', 1)
+          old_text_scan = 'let txt = (el.innerText || "").toLowerCase();'
+          if bridge.count(old_text_scan) != 2:
+              raise SystemExit("Expected two known DOM text scans; source changed.")
+          bridge = bridge.replace(old_text_scan,
+              "let txt = ((el.getAttribute('aria-label') || '') + ' ' + (el.textContent || '')).toLowerCase();", 1)
+
+          # Lower background DOM-polling overhead while keeping event-driven actions
+          # and one-shot post-action refreshes intact.
+          for old, new in [
+              ("aaint = setInterval(run, 1000);", "aaint = setInterval(run, 1500);"),
+              ("tagint = setInterval(tagDOM, 2000);", "tagint = setInterval(tagDOM, 3000);"),
+              ("fsUpdateTimer = setInterval(updateFullscreenUI, 500);", "fsUpdateTimer = setInterval(updateFullscreenUI, 750);"),
+          ]:
+              if bridge.count(old) != 1:
+                  raise SystemExit("Could not uniquely locate polling interval: " + old)
+              bridge = bridge.replace(old, new, 1)
+
+          bridge_path.write_text(bridge, encoding="utf-8")
+          print("Applied async-first foreground playback routing and reduced recurring DOM work.")
+          PY
+          node --check decoded/assets/playlist_sort.js
+          node --check decoded/assets/spotify_bridge.js
+
           # This app intentionally opens its GitHub page and exits when the APK is
           # not signed by the developer's private key. This personal, separately
           # signed build must pass that one launcher gate to run.
