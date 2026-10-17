@@ -106,77 +106,12 @@ jobs:
           asset.write_text(source, encoding="utf-8")
           print("Applied 4 guarded playlist-sort optimizations.")
 
-          # Reduce foreground control latency: prefer Chromium's asynchronous fetch
-          # while the player is visible; retain native proxy fallback for CORS and
-          # background playback compatibility.
+          # Performance pass 1: lower redundant DOM scanning and polling overhead.
+          # Leave the playback network bridge untouched until its block can be safely
+          # isolated against this exact release asset.
           bridge_path = Path("decoded/assets/spotify_bridge.js")
           bridge = bridge_path.read_text(encoding="utf-8")
-          proxy_start = "        if (strUrl && (strUrl.includes('connect-state') || strUrl.includes('melody/v1/msg'))) {"
-          proxy_start_index = bridge.find(proxy_start)
-          if proxy_start_index < 0:
-              raise SystemExit("Could not find playback network proxy block.")
-          fallback_marker = "const resp = await oriFetch(url, opts);"
-          fallback_index = bridge.find(fallback_marker, proxy_start_index)
-          if fallback_index < 0:
-              raise SystemExit("Could not find the normal fetch fallback after playback proxy.")
-          # Bound the proxy block from its start to immediately before the normal
-          # fetch fallback. We retain the normal-fetch block itself without edits.
-          proxy_end_index = bridge.rfind("\\n", proxy_start_index, fallback_index)
-          if proxy_end_index < 0:
-              raise SystemExit("Could not locate proxy block end boundary.")
-          new_proxy = """        if (strUrl && (strUrl.includes('connect-state') || strUrl.includes('melody/v1/msg'))) {
-              // Foreground: let the WebView use a normal async request first. Calling
-              // @JavascriptInterface nativeFetch synchronously can stall JS until
-              // HttpURLConnection finishes its network request (up to 10 seconds).
-              if (document.visibilityState === 'visible') {
-                  try {
-                      const asyncResponse = await oriFetch(url, opts);
-                      if (asyncResponse.status === 404 &&
-                          strUrl.includes('connect-state') &&
-                          strUrl.includes('/command/from/')) {
-                          AndBridge.deferMessage('reload');
-                          location.reload();
-                      }
-                      return asyncResponse;
-                  } catch (asyncError) {
-                      // Some WebView/network combinations may reject the cross-origin
-                      // request. Fall back to the existing native route in that case.
-                      console.debug('[SpotiDuck] Async foreground request failed; using native fallback.', asyncError);
-                  }
-              }
 
-              // Keep the native route for background playback and as a foreground
-              // fallback. This preserves the existing behavior where async fetch fails.
-              try {
-                  const reqHeaders = opts?.headers || {};
-                  const reqBody = opts?.body ? (typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body)) : null;
-                  const rawRes = AndBridge.nativeFetch(strUrl, method, JSON.stringify(reqHeaders), reqBody);
-                  if (rawRes) {
-                      const parsed = JSON.parse(rawRes);
-                      const status = parsed.status || 200;
-                      const resBody = parsed.body || '';
-                      return {
-                          ok: status >= 200 && status < 300,
-                          status: status,
-                          statusText: status === 200 ? 'OK' : '',
-                          headers: new Headers(parsed.headers || {}),
-                          url: strUrl,
-                          json: async () => JSON.parse(resBody || '{}'),
-                          text: async () => resBody,
-                          arrayBuffer: async () => new TextEncoder().encode(resBody).buffer,
-                          clone: function() { return this; }
-                      };
-                  }
-              } catch (e) {
-                  console.error('[Spotifuck] Proxy nativeFetch error:', e);
-              }
-          }""";
-          if ("AndBridge.nativeFetch" not in bridge[proxy_start_index:proxy_end_index]):
-              raise SystemExit("The located playback proxy does not contain the expected native call.")
-          bridge = bridge[:proxy_start_index] + new_proxy + bridge[proxy_end_index:]
-
-          # Avoid repeated layout-forcing innerText reads and scanning nested spans
-          # every time Spotify inserts a DOM subtree.
           observer_selector = 'node.querySelectorAll("button, a, span").forEach(el => {'
           if bridge.count(observer_selector) != 1:
               raise SystemExit("Could not uniquely locate the global DOM text scan.")
@@ -187,8 +122,6 @@ jobs:
           bridge = bridge.replace(old_text_scan,
               "let txt = ((el.getAttribute('aria-label') || '') + ' ' + (el.textContent || '')).toLowerCase();", 1)
 
-          # Lower background DOM-polling overhead while keeping event-driven actions
-          # and one-shot post-action refreshes intact.
           for old, new in [
               ("aaint = setInterval(run, 1000);", "aaint = setInterval(run, 1500);"),
               ("tagint = setInterval(tagDOM, 2000);", "tagint = setInterval(tagDOM, 3000);"),
@@ -199,7 +132,7 @@ jobs:
               bridge = bridge.replace(old, new, 1)
 
           bridge_path.write_text(bridge, encoding="utf-8")
-          print("Applied async-first foreground playback routing and reduced recurring DOM work.")
+          print("Applied DOM-scan and polling optimizations; left network proxy unchanged.")
           PY
           node --check decoded/assets/playlist_sort.js
           node --check decoded/assets/spotify_bridge.js
@@ -207,83 +140,6 @@ jobs:
           # This app intentionally opens its GitHub page and exits when the APK is
           # not signed by the developer's private key. This personal, separately
           # signed build must pass that one launcher gate to run.
-          main_activity = Path("decoded/smali/com/spotiduck/music/MainActivity.smali")
-          smali = main_activity.read_text(encoding="utf-8")
-          guard_start = smali.find(".method public final u()Z")
-          if guard_start < 0:
-              raise SystemExit("Could not find the startup signature guard method.")
-          guard_end_marker = ".end method"
-          guard_end = smali.find(guard_end_marker, guard_start)
-          if guard_end < 0:
-              raise SystemExit("Could not find the end of the startup guard method.")
-          guard_body_end = guard_end + len(guard_end_marker)
-          guard_body = smali[guard_start:guard_body_end]
-          if ("AndBridge;->isSignatureValid()Z" not in guard_body
-              or "https://github.com/23fpsz/SpotiDuck-Releases" not in guard_body):
-              raise SystemExit("Startup guard did not match the expected signature check.")
-          bypass = """.method public final u()Z
-              .locals 1
-
-              const/4 v0, 0x1
-
-              return v0
-          .end method"""
-          smali = smali[:guard_start] + bypass + smali[guard_body_end:]
-          main_activity.write_text(smali, encoding="utf-8")
-          print("Patched the startup signature gate for this personal build.")
-
-          # Rename the package ID so this build installs beside the official app.
-          manifest_path = Path("decoded/AndroidManifest.xml")
-          android_ns = "http://schemas.android.com/apk/res/android"
-          ET.register_namespace("android", android_ns)
-          ET.register_namespace("tools", "http://schemas.android.com/tools")
-          ET.register_namespace("dist", "http://schemas.android.com/apk/distribution")
-          key_name = "{" + android_ns + "}name"
-          key_target = "{" + android_ns + "}targetActivity"
-          key_authorities = "{" + android_ns + "}authorities"
-          key_permission = "{" + android_ns + "}permission"
-          key_read_permission = "{" + android_ns + "}readPermission"
-          key_write_permission = "{" + android_ns + "}writePermission"
-          key_affinity = "{" + android_ns + "}taskAffinity"
-          tree = ET.parse(manifest_path)
-          root = tree.getroot()
-          old_package = root.get("package")
-          new_package = "com.dinozucchini4.spotiduck.fast"
-          if not old_package:
-              raise SystemExit("Manifest package was not present; refusing unsafe package rename.")
-          root.set("package", new_package)
-
-          component_tags = {"application", "activity", "activity-alias", "service", "receiver", "provider", "instrumentation"}
-          permission_tags = {"permission", "permission-group", "permission-tree", "uses-permission", "uses-permission-sdk-23", "uses-permission-sdk-m"}
-          for element in root.iter():
-              tag = element.tag.split("}")[-1]
-              if tag in component_tags:
-                  for attr in (key_name, key_target):
-                      value = element.get(attr)
-                      if value:
-                          if value.startswith("."):
-                              value = old_package + value
-                          elif "." not in value:
-                              value = old_package + "." + value
-                          element.set(attr, value)
-              elif tag in permission_tags:
-                  value = element.get(key_name)
-                  if value and (value == old_package or value.startswith(old_package + ".")):
-                      element.set(key_name, new_package + value[len(old_package):])
-
-              for attr in (key_authorities, key_permission, key_read_permission, key_write_permission, key_affinity):
-                  value = element.get(attr)
-                  if value and old_package in value:
-                      element.set(attr, value.replace(old_package, new_package))
-
-          app = root.find("application")
-          if app is None:
-              raise SystemExit("No application node found in manifest.")
-          app.set("{" + android_ns + "}label", "SpotiDuck Fast")
-          tree.write(manifest_path, encoding="utf-8", xml_declaration=True)
-          print("Renamed package from %s to %s." % (old_package, new_package))
-          PY
-          node --check decoded/assets/playlist_sort.js
 
       - name: Diagnose GitHub redirect handling
         shell: bash
