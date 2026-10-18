@@ -83,7 +83,83 @@ if bridge.count(old_values) != 1:
 bridge = bridge.replace(old_values, new_values, 1)
 bridge_path.write_text(bridge, encoding='utf-8')
 
-# 2) Extend the existing widget layout without creating a separate widget/provider.
+# 1b) Prefer the browser's asynchronous Fetch API for player command traffic.
+# The old path synchronously called nativeFetch() before trying normal fetch;
+# nativeFetch has 10-second network timeouts and can block the WebView JS thread.
+proxy_start = "        const strUrl = typeof url === 'string' ? url : (url && url.url ? url.url : '');"
+proxy_end_marker = "\n    };\n\n    // =========================================================================\n    // SECTION 3: WAKE LOCK & BACKGROUND CONTROL"
+if bridge.count(proxy_start) != 1:
+    raise SystemExit('Could not uniquely find the synchronous fetch proxy block.')
+proxy_start_at = bridge.index(proxy_start)
+proxy_end_at = bridge.find(proxy_end_marker, proxy_start_at)
+if proxy_end_at < 0:
+    raise SystemExit('Could not find the end of the fetch wrapper; refusing unsafe patch.')
+new_proxy = '''        const strUrl = typeof url === 'string' ? url : (url && url.url ? url.url : '');
+        const needsNativeFallback = strUrl &&
+            (strUrl.includes('connect-state') || strUrl.includes('melody/v1/msg'));
+
+        // Let ordinary Fetch complete asynchronously first. This keeps long-poll or
+        // player-command network traffic from blocking the WebView JavaScript thread.
+        if (needsNativeFallback) {
+            try {
+                const response = await oriFetch(url, opts);
+                if (response.status === 404 &&
+                    strUrl.includes('connect-state') &&
+                    strUrl.includes('/command/from/')) {
+                    AndBridge.deferMessage('reload');
+                    location.reload();
+                }
+                return response;
+            } catch (fetchError) {
+                // Keep the native path as a compatibility fallback for WebView/CORS
+                // failures only; do not use it on every successful player request.
+                try {
+                    const reqHeaders = opts?.headers || {};
+                    const reqBody = opts?.body
+                        ? (typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body))
+                        : null;
+                    const rawRes = AndBridge.nativeFetch(
+                        strUrl, method, JSON.stringify(reqHeaders), reqBody
+                    );
+                    if (rawRes) {
+                        const parsed = JSON.parse(rawRes);
+                        const status = parsed.status || 200;
+                        const resBody = parsed.body || '';
+                        return {
+                            ok: status >= 200 && status < 300,
+                            status: status,
+                            statusText: status === 200 ? 'OK' : '',
+                            headers: new Headers(parsed.headers || {}),
+                            url: strUrl,
+                            json: async () => JSON.parse(resBody || '{}'),
+                            text: async () => resBody,
+                            arrayBuffer: async () => new TextEncoder().encode(resBody).buffer,
+                            clone: function() { return this; }
+                        };
+                    }
+                } catch (nativeError) {
+                    console.error('[Spotifuck] Native fetch fallback error:', nativeError);
+                }
+                throw fetchError;
+            }
+        }
+
+        try {
+            const resp = await oriFetch(url, opts);
+            if (resp.status === 404 &&
+                strUrl.includes('connect-state') &&
+                strUrl.includes('/command/from/')) {
+                AndBridge.deferMessage('reload');
+                location.reload();
+            }
+            return resp;
+        } catch (err) {
+            throw err;
+        }'''
+bridge = bridge[:proxy_start_at] + new_proxy + bridge[proxy_end_at:]
+bridge_path.write_text(bridge, encoding='utf-8')
+
+# 2) Extend the existing native widget layouts without adding a new widget provider. without creating a separate widget/provider.
 layout_path = ROOT / 'res/layout/widget_expanded.xml'
 ET.register_namespace('android', 'http://schemas.android.com/apk/res/android')
 tree = ET.parse(layout_path)
@@ -111,6 +187,51 @@ title.set(ANDROID + 'textSize', '14sp')
 artist = by_id['@id/txt_artist']
 artist.set(ANDROID + 'textSize', '12sp')
 artist.set(ANDROID + 'text', '')
+
+# The updater calls RemoteViews.setTextViewText(txt_playlist) on both layout variants.
+# Registering an ID alone is insufficient: Android rejects the update when that view
+# is absent. Add a real subtitle in the expanded layout and a hidden placeholder in slim.
+artist_parent = next((n for n in root.iter() if artist in list(n)), None)
+if artist_parent is None:
+    raise SystemExit('Could not find the title column for the playlist subtitle.')
+if not any(n.get(ANDROID + 'id') == '@id/txt_playlist' for n in root.iter()):
+    subtitle = ET.Element('TextView', {
+        ANDROID + 'id': '@id/txt_playlist',
+        ANDROID + 'layout_width': 'match_parent',
+        ANDROID + 'layout_height': 'wrap_content',
+        ANDROID + 'text': '',
+        ANDROID + 'textSize': '10sp',
+        ANDROID + 'textColor': '#ff9e9e9e',
+        ANDROID + 'maxLines': '1',
+        ANDROID + 'ellipsize': 'end'
+    })
+    artist_parent.insert(list(artist_parent).index(artist) + 1, subtitle)
+
+compact_path = ROOT / 'res/layout/home_widget.xml'
+compact_tree = ET.parse(compact_path)
+compact_root = compact_tree.getroot()
+compact_container = next((n for n in compact_root.iter()
+                          if n.get(ANDROID + 'id') == '@id/content_container'), None)
+if compact_container is None:
+    raise SystemExit('Could not find compact widget content container.')
+if not any(n.get(ANDROID + 'id') == '@id/txt_playlist' for n in compact_root.iter()):
+    compact_subtitle = ET.Element('TextView', {
+        ANDROID + 'id': '@id/txt_playlist',
+        ANDROID + 'layout_width': 'match_parent',
+        ANDROID + 'layout_height': 'wrap_content',
+        ANDROID + 'text': '',
+        ANDROID + 'textSize': '9sp',
+        ANDROID + 'textColor': '#ff9e9e9e',
+        ANDROID + 'maxLines': '1',
+        ANDROID + 'ellipsize': 'end',
+        ANDROID + 'visibility': 'gone'
+    })
+    full_title = next((n for n in compact_container.iter()
+                       if n.get(ANDROID + 'id') == '@id/txt_fulltitle'), None)
+    if full_title is None:
+        raise SystemExit('Could not find compact widget title for subtitle insertion.')
+    compact_container.insert(list(compact_container).index(full_title) + 1, compact_subtitle)
+compact_tree.write(compact_path, encoding='utf-8', xml_declaration=True)
 
 # Like belongs in the common six-control row rather than the artwork/title row.
 fav_container = next((n for n in top if n.get(ANDROID + 'id') == '@id/fav_container'), None)
@@ -354,6 +475,12 @@ required_tile_ids += [f'playlist_tile_label_{i}' for i in range(1, 6)]
 for name in required_tile_ids:
     if layout_ids.count('@id/' + name) != 1:
         raise SystemExit('New widget ID missing or duplicated: ' + name)
+for layout_file in (ROOT / 'res/layout/widget_expanded.xml', ROOT / 'res/layout/home_widget.xml'):
+    layout_ids_here = [node.get(ANDROID + 'id') for node in ET.parse(layout_file).getroot().iter()]
+    if layout_ids_here.count('@id/txt_playlist') != 1:
+        raise SystemExit('Playlist subtitle must exist exactly once in ' + str(layout_file))
+if bridge.index('const response = await oriFetch(url, opts);') > bridge.index('AndBridge.nativeFetch('):
+    raise SystemExit('Native network proxy is still called before asynchronous fetch.')
 for token in ['tile1:', 'tile2:', 'tile3:', 'tile4:', 'tile5:', 'playlist: playlistName']:
     if token not in bridge:
         raise SystemExit('JS media status is missing: ' + token)
