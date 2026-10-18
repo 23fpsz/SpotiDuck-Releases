@@ -7,6 +7,7 @@ on:
       - widget-design-experiment
     paths:
       - .github/workflows/build-spotiduck-fast.yml
+      - scripts/patch-widget.py
   workflow_dispatch:
 
 permissions:
