@@ -43,10 +43,35 @@ new_state = '''        const playlistName = (() => {
         const mediaLib = window.mediaLib || {};
         const playlistItems = (mediaLib.playlists || []).filter(item => item && item.name && item.id);
         const albumItems = (mediaLib.albums || []).filter(item => item && item.name && item.id);
-        const tileItems = [...playlistItems.slice(0, 3), ...albumItems.slice(0, 2)];
+        const tileItems = [
+            ...playlistItems.slice(0, 3).map(item => ({ item, kind: 'playlist' })),
+            ...albumItems.slice(0, 2).map(item => ({ item, kind: 'album' }))
+        ];
         const defaultTileNames = ['Liked Songs', 'Playlists', 'Made for you', 'Recently played', 'Albums'];
-        const tileNames = Array.from({length: 5}, (_, i) => tileItems[i]?.name || defaultTileNames[i]);
-        const tileImages = Array.from({length: 5}, (_, i) => tileItems[i]?.image || '');
+        const defaultTileUrls = [
+            'https://open.spotify.com/collection/tracks',
+            'https://open.spotify.com/collection/playlists',
+            'https://open.spotify.com/section/0JQ5DAqbMKFzHmL4tf1CUd',
+            'https://open.spotify.com/collection/recently-played',
+            'https://open.spotify.com/collection/albums'
+        ];
+        const tileNames = Array.from({length: 5}, (_, i) => tileItems[i]?.item?.name || defaultTileNames[i]);
+        const tileImages = Array.from({length: 5}, (_, i) => {
+            const item = tileItems[i]?.item;
+            const candidate = item?.image || item?.imageUrl || item?.cover || item?.images?.[0]?.url || '';
+            return typeof candidate === 'string' ? candidate : '';
+        });
+        const tileUrls = Array.from({length: 5}, (_, i) => {
+            const entry = tileItems[i];
+            if (!entry) return defaultTileUrls[i];
+            const item = entry.item;
+            const raw = item.url || item.href || item.uri || '';
+            if (typeof raw === 'string' && raw.startsWith('https://')) return raw;
+            if (typeof raw === 'string' && raw.startsWith('spotify:')) {
+                return 'https://open.spotify.com/' + raw.slice('spotify:'.length).replace(/:/g, '/');
+            }
+            return item.id ? 'https://open.spotify.com/' + entry.kind + '/' + item.id : defaultTileUrls[i];
+        });
         const currState = [
             window.track || "",
             window.artist || "",
@@ -56,7 +81,9 @@ new_state = '''        const playlistName = (() => {
             window.isfav,
             window.cover || "",
             playlistName,
-            tileNames.join('|')
+            tileNames.join('|'),
+            tileImages.join('|'),
+            tileUrls.join('|')
         ].join('|');'''
 if bridge.count(old_state) != 1:
     raise SystemExit('JS media state block did not match exactly; refusing patch.')
@@ -76,6 +103,11 @@ new_values = '''                cover: window.cover || "",
                 tileImage3: tileImages[2],
                 tileImage4: tileImages[3],
                 tileImage5: tileImages[4],
+                tileUrl1: tileUrls[0],
+                tileUrl2: tileUrls[1],
+                tileUrl3: tileUrls[2],
+                tileUrl4: tileUrls[3],
+                tileUrl5: tileUrls[4],
                 duration: window.duration || 0,
                 position: window.position || 0'''
 if bridge.count(old_values) != 1:
@@ -177,7 +209,20 @@ info.attrib.pop(ANDROID + 'layout_toStartOf', None)
 controls = by_id['@id/controls_row']
 progress = by_id['@id/progress_row']
 
-widget_root.set(ANDROID + 'layout_height', '244dp')
+widget_root.set(ANDROID + 'layout_height', '252dp')
+for control_id in ('@id/btn_shuffle', '@id/btn_prev', '@id/btn_play', '@id/btn_next', '@id/btn_repeat', '@id/btn_fav'):
+    if control_id not in by_id:
+        raise SystemExit('Required control is missing: ' + control_id)
+for control_id in ('@id/btn_prev', '@id/btn_next'):
+    by_id[control_id].set(ANDROID + 'layout_marginStart', '8dp')
+    by_id[control_id].set(ANDROID + 'layout_marginEnd', '8dp')
+play_frame = next((n for n in controls if n.tag.endswith('FrameLayout')), None)
+if play_frame is None:
+    raise SystemExit('Play control frame not found.')
+play_frame.set(ANDROID + 'layout_width', '44dp')
+play_frame.set(ANDROID + 'layout_height', '44dp')
+play_frame.set(ANDROID + 'layout_marginStart', '8dp')
+play_frame.set(ANDROID + 'layout_marginEnd', '8dp')
 cover_frame = next((n for n in info if n.tag.endswith('FrameLayout')), None)
 if cover_frame is not None:
     cover_frame.set(ANDROID + 'layout_width', '72dp')
@@ -187,6 +232,8 @@ title.set(ANDROID + 'textSize', '14sp')
 artist = by_id['@id/txt_artist']
 artist.set(ANDROID + 'textSize', '12sp')
 artist.set(ANDROID + 'text', '')
+artist.set(ANDROID + 'visibility', 'gone')
+title.set(ANDROID + 'singleLine', 'true')
 
 # The updater calls RemoteViews.setTextViewText(txt_playlist) on both layout variants.
 # Registering an ID alone is insufficient: Android rejects the update when that view
@@ -254,7 +301,7 @@ if not any(n.get(ANDROID + 'id') == '@id/playlist_tiles_row' for n in root.iter(
         ANDROID + 'orientation': 'horizontal',
         ANDROID + 'gravity': 'center',
         ANDROID + 'layout_width': 'match_parent',
-        ANDROID + 'layout_height': '48dp',
+        ANDROID + 'layout_height': '52dp',
         ANDROID + 'layout_marginTop': '4dp'
     })
     defaults = ['Liked Songs', 'Made for you', 'Recently played', 'Playlists', 'Albums']
@@ -263,7 +310,7 @@ if not any(n.get(ANDROID + 'id') == '@id/playlist_tiles_row' for n in root.iter(
             ANDROID + 'id': f'@id/playlist_tile_{i}',
             ANDROID + 'orientation': 'vertical',
             ANDROID + 'layout_width': '0dp',
-            ANDROID + 'layout_height': '48dp',
+            ANDROID + 'layout_height': '52dp',
             ANDROID + 'layout_weight': '1',
             ANDROID + 'layout_marginHorizontal': '3dp',
             ANDROID + 'gravity': 'center',
@@ -275,7 +322,7 @@ if not any(n.get(ANDROID + 'id') == '@id/playlist_tiles_row' for n in root.iter(
             ANDROID + 'layout_width': 'match_parent',
             ANDROID + 'layout_height': '30dp',
             ANDROID + 'scaleType': 'centerCrop',
-            ANDROID + 'src': '@drawable/logo_duck'
+            ANDROID + 'src': '@drawable/widget_tile_placeholder'
         })
         ET.SubElement(tile, 'TextView', {
             ANDROID + 'id': f'@id/playlist_tile_label_{i}',
