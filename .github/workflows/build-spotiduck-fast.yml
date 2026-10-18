@@ -287,7 +287,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          zip -q widget-source-debug.zip decoded/res/layout/widget_expanded.xml decoded/res/layout/home_widget.xml decoded/res/xml/home_widget_info.xml decoded/res/values/public.xml decoded/res/values/ids.xml decoded/smali/com/spotiduck/music/a.smali decoded/smali/com/spotiduck/music/HomeWidget.smali decoded/smali/com/spotiduck/music/AndBridge.smali 'decoded/smali/com/spotiduck/music/WebService$MediaActionReceiver.smali' decoded/smali/com/spotiduck/music/WebService.smali decoded/smali/com/squareup/picasso/Picasso.smali decoded/smali/com/squareup/picasso/RequestCreator.smali decoded/assets/spotify_bridge.js
+          zip -q widget-source-debug.zip decoded/res/layout/widget_expanded.xml decoded/res/layout/home_widget.xml decoded/res/xml/home_widget_info.xml decoded/res/values/public.xml decoded/res/values/ids.xml decoded/smali/com/spotiduck/music/a.smali decoded/smali/com/spotiduck/music/HomeWidget.smali decoded/smali/com/spotiduck/music/MainActivity.smali decoded/smali/com/spotiduck/music/AndBridge.smali 'decoded/smali/com/spotiduck/music/WebService$MediaActionReceiver.smali' decoded/smali/com/spotiduck/music/WebService.smali decoded/smali/com/squareup/picasso/Picasso.smali decoded/smali/com/squareup/picasso/RequestCreator.smali decoded/assets/spotify_bridge.js
+          find decoded -name 'r4.smali' -print -exec zip -q widget-source-debug.zip {} \;
           ls -lh widget-source-debug.zip
 
       - name: Validate native widget metadata and controls
