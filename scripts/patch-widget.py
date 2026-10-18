@@ -49,11 +49,11 @@ new_state = '''        const playlistName = (() => {
         ];
         const defaultTileNames = ['Liked Songs', 'Playlists', 'Made for you', 'Recently played', 'Albums'];
         const defaultTileUrls = [
-            'https://open.spotify.com/collection/tracks',
-            'https://open.spotify.com/collection/playlists',
-            'https://open.spotify.com/section/0JQ5DAqbMKFzHmL4tf1CUd',
-            'https://open.spotify.com/collection/recently-played',
-            'https://open.spotify.com/collection/albums'
+            'spotify:collection:tracks',
+            'spotify:collection:playlists',
+            'spotify:section:0JQ5DAqbMKFzHmL4tf1CUd',
+            'spotify:collection:recently-played',
+            'spotify:collection:albums'
         ];
         const tileNames = Array.from({length: 5}, (_, i) => tileItems[i]?.item?.name || defaultTileNames[i]);
         const tileImages = Array.from({length: 5}, (_, i) => {
@@ -65,12 +65,13 @@ new_state = '''        const playlistName = (() => {
             const entry = tileItems[i];
             if (!entry) return defaultTileUrls[i];
             const item = entry.item;
-            const raw = item.url || item.href || item.uri || '';
-            if (typeof raw === 'string' && raw.startsWith('https://')) return raw;
-            if (typeof raw === 'string' && raw.startsWith('spotify:')) {
-                return 'https://open.spotify.com/' + raw.slice('spotify:'.length).replace(/:/g, '/');
+            const raw = item.uri || item.spotifyUri || item.url || item.href || '';
+            if (typeof raw === 'string' && raw.startsWith('spotify:')) return raw;
+            if (typeof raw === 'string') {
+                const match = raw.match(/open\\.spotify\\.com\\/(playlist|album)\\/([A-Za-z0-9]+)/);
+                if (match) return 'spotify:' + match[1] + ':' + match[2];
             }
-            return item.id ? 'https://open.spotify.com/' + entry.kind + '/' + item.id : defaultTileUrls[i];
+            return item.id ? 'spotify:' + entry.kind + ':' + item.id : defaultTileUrls[i];
         });
         const currState = [
             window.track || "",
@@ -341,6 +342,26 @@ if not any(n.get(ANDROID + 'id') == '@id/playlist_tiles_row' for n in root.iter(
 
 tree.write(layout_path, encoding='utf-8', xml_declaration=True)
 
+# Neutral placeholders avoid showing SpotiDuck branding before artwork loads.
+placeholder_path = ROOT / 'res/drawable/widget_tile_placeholder.xml'
+placeholder_path.write_text('''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FF292929" />
+    <corners android:radius="8dp" />
+</shape>
+''', encoding='utf-8')
+for target_layout in (layout_path, compact_path):
+    target_root = ET.parse(target_layout).getroot()
+    cover = next((n for n in target_root.iter() if n.get(ANDROID + 'id') == '@id/img_cover'), None)
+    if cover is not None:
+        cover.set(ANDROID + 'src', '@drawable/widget_tile_placeholder')
+    if target_layout == layout_path:
+        for node in target_root.iter():
+            node_id = node.get(ANDROID + 'id') or ''
+            if node_id.startswith('@id/playlist_tile_image_'):
+                node.set(ANDROID + 'src', '@drawable/widget_tile_placeholder')
+    ET.ElementTree(target_root).write(target_layout, encoding='utf-8', xml_declaration=True)
+
 # 3) Register stable IDs for the five tiles and their parent row. IDs start after
 # the highest ID in the inspected release's public resource table.
 new_ids = {
@@ -364,6 +385,8 @@ new_ids = {
 }
 public_path = ROOT / 'res/values/public.xml'
 public = public_path.read_text(encoding='utf-8')
+if 'name="widget_tile_placeholder"' not in public:
+    public = public.replace('</resources>', '    <public type="drawable" name="widget_tile_placeholder" id="0x7f08013b" />\n</resources>', 1)
 for name, value in new_ids.items():
     if f'name="{name}"' not in public:
         public = public.replace('</resources>', f'    <public type="id" name="{name}" id="{value}" />\n</resources>', 1)
@@ -386,6 +409,16 @@ fields = '''.field public static widgetPlaylist:Ljava/lang/String; = ""
 .field public static widgetTile3:Ljava/lang/String; = "Recently played"
 .field public static widgetTile4:Ljava/lang/String; = "Playlists"
 .field public static widgetTile5:Ljava/lang/String; = "Albums"
+.field public static widgetTileImage1:Ljava/lang/String; = ""
+.field public static widgetTileImage2:Ljava/lang/String; = ""
+.field public static widgetTileImage3:Ljava/lang/String; = ""
+.field public static widgetTileImage4:Ljava/lang/String; = ""
+.field public static widgetTileImage5:Ljava/lang/String; = ""
+.field public static widgetTileUrl1:Ljava/lang/String; = "spotify:collection:tracks"
+.field public static widgetTileUrl2:Ljava/lang/String; = "spotify:collection:playlists"
+.field public static widgetTileUrl3:Ljava/lang/String; = "spotify:section:0JQ5DAqbMKFzHmL4tf1CUd"
+.field public static widgetTileUrl4:Ljava/lang/String; = "spotify:collection:recently-played"
+.field public static widgetTileUrl5:Ljava/lang/String; = "spotify:collection:albums"
 
 '''
 if service.count(field_anchor) != 1:
@@ -444,6 +477,56 @@ insert = '''    const-string p1, "playlist"
 
     sput-object p1, Lcom/spotiduck/music/WebService;->widgetTile5:Ljava/lang/String;
 
+    const-string p1, "tileImage1"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileImage1:Ljava/lang/String;
+
+    const-string p1, "tileImage2"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileImage2:Ljava/lang/String;
+
+    const-string p1, "tileImage3"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileImage3:Ljava/lang/String;
+
+    const-string p1, "tileImage4"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileImage4:Ljava/lang/String;
+
+    const-string p1, "tileImage5"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileImage5:Ljava/lang/String;
+
+    const-string p1, "tileUrl1"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileUrl1:Ljava/lang/String;
+
+    const-string p1, "tileUrl2"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileUrl2:Ljava/lang/String;
+
+    const-string p1, "tileUrl3"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileUrl3:Ljava/lang/String;
+
+    const-string p1, "tileUrl4"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileUrl4:Ljava/lang/String;
+
+    const-string p1, "tileUrl5"
+    invoke-virtual {p0, p1}, Lorg/json/JSONObject;->optString(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object p1
+    sput-object p1, Lcom/spotiduck/music/WebService;->widgetTileUrl5:Ljava/lang/String;
+
     const-string p1, "cover"'''
 if smali.count(anchor) != 1:
     raise SystemExit('Could not safely find AndBridge cover metadata insertion point.')
@@ -492,19 +575,19 @@ click_pattern = re.compile(
 click_insert = '''    invoke-virtual {v7, v13, v0}, Landroid/widget/RemoteViews;->setOnClickPendingIntent(ILandroid/app/PendingIntent;)V
 
     sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile1:Ljava/lang/String;
-    const v5, 0x7f090230
+    const v5, 0x7f09023a
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
     sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile2:Ljava/lang/String;
-    const v5, 0x7f090231
+    const v5, 0x7f09023b
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
     sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile3:Ljava/lang/String;
-    const v5, 0x7f090232
+    const v5, 0x7f09023c
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
     sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile4:Ljava/lang/String;
-    const v5, 0x7f090233
+    const v5, 0x7f09023d
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
     sget-object v4, Lcom/spotiduck/music/WebService;->widgetTile5:Ljava/lang/String;
-    const v5, 0x7f090234
+    const v5, 0x7f09023e
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
 
     goto :goto_e'''
