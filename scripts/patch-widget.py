@@ -780,8 +780,8 @@ if 'Picasso;->load(Ljava/lang/String;)' not in widget_builder:
 for parent_id, label_id in [('0x7f090230', '0x7f09023a'), ('0x7f090231', '0x7f09023b'),
                             ('0x7f090232', '0x7f09023c'), ('0x7f090233', '0x7f09023d'),
                             ('0x7f090234', '0x7f09023e')]:
-    if f'const v5, {label_id}\\n    invoke-virtual {{v7, v5, v4}}, Landroid/widget/RemoteViews;->setTextViewText' not in widget_builder:
+    if f'const v5, {label_id}\n    invoke-virtual {{v7, v5, v4}}, Landroid/widget/RemoteViews;->setTextViewText' not in widget_builder:
         raise SystemExit('Tile label must target its TextView: ' + label_id)
-    if f'const v5, {parent_id}\\n    invoke-virtual {{v7, v5, v4}}, Landroid/widget/RemoteViews;->setTextViewText' in widget_builder:
+    if f'const v5, {parent_id}\n    invoke-virtual {{v7, v5, v4}}, Landroid/widget/RemoteViews;->setTextViewText' in widget_builder:
         raise SystemExit('Invalid setTextViewText target is a tile container: ' + parent_id)
 print('Patched widget layout, artwork, tile routing, and controls with guarded checks.')
