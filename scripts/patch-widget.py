@@ -590,6 +590,32 @@ click_insert = '''    invoke-virtual {v7, v13, v0}, Landroid/widget/RemoteViews;
     const v5, 0x7f09023e
     invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setTextViewText(ILjava/lang/CharSequence;)V
 
+    const-string v4, "WIDGET_TILE_1"
+    invoke-static {v0, v4}, Lcom/spotiduck/music/a;->a(Landroid/content/Context;Ljava/lang/String;)Landroid/app/PendingIntent;
+    move-result-object v4
+    const v5, 0x7f090230
+    invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setOnClickPendingIntent(ILandroid/app/PendingIntent;)V
+    const-string v4, "WIDGET_TILE_2"
+    invoke-static {v0, v4}, Lcom/spotiduck/music/a;->a(Landroid/content/Context;Ljava/lang/String;)Landroid/app/PendingIntent;
+    move-result-object v4
+    const v5, 0x7f090231
+    invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setOnClickPendingIntent(ILandroid/app/PendingIntent;)V
+    const-string v4, "WIDGET_TILE_3"
+    invoke-static {v0, v4}, Lcom/spotiduck/music/a;->a(Landroid/content/Context;Ljava/lang/String;)Landroid/app/PendingIntent;
+    move-result-object v4
+    const v5, 0x7f090232
+    invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setOnClickPendingIntent(ILandroid/app/PendingIntent;)V
+    const-string v4, "WIDGET_TILE_4"
+    invoke-static {v0, v4}, Lcom/spotiduck/music/a;->a(Landroid/content/Context;Ljava/lang/String;)Landroid/app/PendingIntent;
+    move-result-object v4
+    const v5, 0x7f090233
+    invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setOnClickPendingIntent(ILandroid/app/PendingIntent;)V
+    const-string v4, "WIDGET_TILE_5"
+    invoke-static {v0, v4}, Lcom/spotiduck/music/a;->a(Landroid/content/Context;Ljava/lang/String;)Landroid/app/PendingIntent;
+    move-result-object v4
+    const v5, 0x7f090234
+    invoke-virtual {v7, v5, v4}, Landroid/widget/RemoteViews;->setOnClickPendingIntent(ILandroid/app/PendingIntent;)V
+
     goto :goto_e'''
 widget_builder, click_count = click_pattern.subn(lambda _: click_insert, widget_builder, count=1)
 if click_count != 1:
