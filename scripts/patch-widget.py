@@ -744,7 +744,7 @@ for i, image_id in enumerate(['0x7f090235', '0x7f090236', '0x7f090237', '0x7f090
         '    aput p1, v4, v5',
         f'    const v3, {image_id}',
         '    invoke-virtual {v2, p2, v3, v4}, Lcom/squareup/picasso/RequestCreator;->into(Landroid/widget/RemoteViews;I[I)V',
-        f'    {next_label}' if i < 5 else ''
+        f'    {next_label}'
     ])
 loader_method.extend(['    return-void', '.end method', ''])
 loader_text = '\n'.join(loader_method)
