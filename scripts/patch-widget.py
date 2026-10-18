@@ -549,7 +549,7 @@ tile_dispatch = '''    invoke-virtual {p2}, Landroid/content/Intent;->getAction(
 
 '''
 receiver = receiver.replace(receiver_anchor, tile_dispatch + receiver_anchor, 1)
-if 'openWidgetTile(Landroid/content/Context;Ljava/lang/String;)Z' not in receiver:
+if '.method private static openWidgetTile(Landroid/content/Context;Ljava/lang/String;)Z' not in receiver:
     receiver_method = '''
 .method private static openWidgetTile(Landroid/content/Context;Ljava/lang/String;)Z
     .locals 3
@@ -768,7 +768,20 @@ for layout_file in (ROOT / 'res/layout/widget_expanded.xml', ROOT / 'res/layout/
         raise SystemExit('Playlist subtitle must exist exactly once in ' + str(layout_file))
 if bridge.index('const response = await oriFetch(url, opts);') > bridge.index('AndBridge.nativeFetch('):
     raise SystemExit('Native network proxy is still called before asynchronous fetch.')
-for token in ['tile1:', 'tile2:', 'tile3:', 'tile4:', 'tile5:', 'playlist: playlistName']:
+for token in ['tile1:', 'tile2:', 'tile3:', 'tile4:', 'tile5:', 'tileImage1:', 'tileImage5:', 'tileUrl1:', 'tileUrl5:', 'playlist: playlistName']:
     if token not in bridge:
         raise SystemExit('JS media status is missing: ' + token)
-print('Patched expanded widget metadata and five library shortcut captions with guarded checks.')
+if not placeholder_path.exists():
+    raise SystemExit('Neutral widget artwork placeholder resource was not created.')
+if 'private static openWidgetTile' not in receiver:
+    raise SystemExit('Playlist shortcut receiver handler was not added.')
+if 'Picasso;->load(Ljava/lang/String;)' not in widget_builder:
+    raise SystemExit('Widget artwork loader was not added.')
+for parent_id, label_id in [('0x7f090230', '0x7f09023a'), ('0x7f090231', '0x7f09023b'),
+                            ('0x7f090232', '0x7f09023c'), ('0x7f090233', '0x7f09023d'),
+                            ('0x7f090234', '0x7f09023e')]:
+    if f'const v5, {label_id}\\n    invoke-virtual {{v7, v5, v4}}, Landroid/widget/RemoteViews;->setTextViewText' not in widget_builder:
+        raise SystemExit('Tile label must target its TextView: ' + label_id)
+    if f'const v5, {parent_id}\\n    invoke-virtual {{v7, v5, v4}}, Landroid/widget/RemoteViews;->setTextViewText' in widget_builder:
+        raise SystemExit('Invalid setTextViewText target is a tile container: ' + parent_id)
+print('Patched widget layout, artwork, tile routing, and controls with guarded checks.')
