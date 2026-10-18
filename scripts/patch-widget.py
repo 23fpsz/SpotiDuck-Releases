@@ -154,7 +154,7 @@ if not any(n.get(ANDROID + 'id') == '@id/playlist_tiles_row' for n in root.iter(
             ANDROID + 'layout_width': 'match_parent',
             ANDROID + 'layout_height': '30dp',
             ANDROID + 'scaleType': 'centerCrop',
-            ANDROID + 'src': '@drawable/widget_default_tile'
+            ANDROID + 'src': '@drawable/logo_duck'
         })
         ET.SubElement(tile, 'TextView', {
             ANDROID + 'id': f'@id/playlist_tile_label_{i}',
