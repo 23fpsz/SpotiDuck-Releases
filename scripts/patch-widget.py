@@ -611,7 +611,7 @@ if 'openWidgetTile(Landroid/content/Context;Ljava/lang/String;)Z' not in receive
     return v0
 .end method
 '''
-    receiver = receiver.rstrip() + '\\n' + receiver_method
+    receiver = receiver.rstrip() + '\n' + receiver_method
 receiver_path.write_text(receiver, encoding='utf-8')
 
 # 5) The expanded widget's first line should read “Song Title • Artist”. The second
@@ -709,14 +709,14 @@ if method_start < 0 or method_end < 0:
 method_end += len('.end method')
 widget_method = widget_builder[method_start:method_end]
 widget_method = widget_method.replace('0x7f0800d6', '0x7f08013b')
-image_call_anchor = ':goto_f\\n    return-void\\n.end method'
+image_call_anchor = ':goto_f\n    return-void\n.end method'
 if widget_method.count(image_call_anchor) != 1:
     raise SystemExit('Could not find widget update return point for asynchronous tile artwork.')
 widget_method = widget_method.replace(
     image_call_anchor,
-    ':goto_f\\n    if-eqz v3, :widget_tile_art_done\\n'
-    '    invoke-static {v0, v2, v7}, Lcom/spotiduck/music/a;->e(Landroid/content/Context;ILandroid/widget/RemoteViews;)V\\n'
-    '    :widget_tile_art_done\\n    return-void\\n.end method',
+    ':goto_f\n    if-eqz v3, :widget_tile_art_done\n'
+    '    invoke-static {v0, v2, v7}, Lcom/spotiduck/music/a;->e(Landroid/content/Context;ILandroid/widget/RemoteViews;)V\n'
+    '    :widget_tile_art_done\n    return-void\n.end method',
     1)
 widget_builder = widget_builder[:method_start] + widget_method + widget_builder[method_end:]
 
@@ -747,7 +747,7 @@ for i, image_id in enumerate(['0x7f090235', '0x7f090236', '0x7f090237', '0x7f090
         f'    {next_label}' if i < 5 else ''
     ])
 loader_method.extend(['    return-void', '.end method', ''])
-loader_text = '\\n'.join(loader_method)
+loader_text = '\n'.join(loader_method)
 if 'widgetTileImage1' not in widget_builder:
     raise SystemExit('Widget image fields are not declared in the bridge state.')
 widget_builder += loader_text
