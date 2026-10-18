@@ -533,6 +533,87 @@ if smali.count(anchor) != 1:
 smali = smali.replace(anchor, insert, 1)
 bridge_smali_path.write_text(smali, encoding='utf-8')
 
+# Route library tile taps through MainActivity's existing spotify_uri handler.
+receiver_path = ROOT / 'smali/com/spotiduck/music/WebService$MediaActionReceiver.smali'
+receiver = receiver_path.read_text(encoding='utf-8')
+receiver_anchor = '    const-string p0, "audio"'
+if receiver.count(receiver_anchor) != 1:
+    raise SystemExit('Could not locate MediaActionReceiver dispatch entry.')
+tile_dispatch = '''    invoke-virtual {p2}, Landroid/content/Intent;->getAction()Ljava/lang/String;
+    move-result-object v0
+    invoke-static {p1, v0}, Lcom/spotiduck/music/WebService$MediaActionReceiver;->openWidgetTile(Landroid/content/Context;Ljava/lang/String;)Z
+    move-result v0
+    if-eqz v0, :widget_tile_not_handled
+    return-void
+    :widget_tile_not_handled
+
+'''
+receiver = receiver.replace(receiver_anchor, tile_dispatch + receiver_anchor, 1)
+if 'openWidgetTile(Landroid/content/Context;Ljava/lang/String;)Z' not in receiver:
+    receiver_method = '''
+.method private static openWidgetTile(Landroid/content/Context;Ljava/lang/String;)Z
+    .locals 3
+
+    if-eqz p1, :not_widget_tile
+    const-string v0, "WIDGET_TILE_1"
+    invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    move-result v0
+    if-nez v0, :tile_one
+    const-string v0, "WIDGET_TILE_2"
+    invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    move-result v0
+    if-nez v0, :tile_two
+    const-string v0, "WIDGET_TILE_3"
+    invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    move-result v0
+    if-nez v0, :tile_three
+    const-string v0, "WIDGET_TILE_4"
+    invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    move-result v0
+    if-nez v0, :tile_four
+    const-string v0, "WIDGET_TILE_5"
+    invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    move-result v0
+    if-eqz v0, :not_widget_tile
+    sget-object v1, Lcom/spotiduck/music/WebService;->widgetTileUrl5:Ljava/lang/String;
+    goto :launch_widget_tile
+
+    :tile_one
+    sget-object v1, Lcom/spotiduck/music/WebService;->widgetTileUrl1:Ljava/lang/String;
+    goto :launch_widget_tile
+    :tile_two
+    sget-object v1, Lcom/spotiduck/music/WebService;->widgetTileUrl2:Ljava/lang/String;
+    goto :launch_widget_tile
+    :tile_three
+    sget-object v1, Lcom/spotiduck/music/WebService;->widgetTileUrl3:Ljava/lang/String;
+    goto :launch_widget_tile
+    :tile_four
+    sget-object v1, Lcom/spotiduck/music/WebService;->widgetTileUrl4:Ljava/lang/String;
+
+    :launch_widget_tile
+    if-eqz v1, :not_widget_tile
+    invoke-virtual {v1}, Ljava/lang/String;->isEmpty()Z
+    move-result v0
+    if-nez v0, :not_widget_tile
+    new-instance v2, Landroid/content/Intent;
+    const-class v0, Lcom/spotiduck/music/MainActivity;
+    invoke-direct {v2, p0, v0}, Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V
+    const-string v0, "spotify_uri"
+    invoke-virtual {v2, v0, v1}, Landroid/content/Intent;->putExtra(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;
+    const v0, 0x34000000
+    invoke-virtual {v2, v0}, Landroid/content/Intent;->addFlags(I)Landroid/content/Intent;
+    invoke-virtual {p0, v2}, Landroid/content/Context;->startActivity(Landroid/content/Intent;)V
+    const/4 v0, 0x1
+    return v0
+
+    :not_widget_tile
+    const/4 v0, 0x0
+    return v0
+.end method
+'''
+    receiver = receiver.rstrip() + '\\n' + receiver_method
+receiver_path.write_text(receiver, encoding='utf-8')
+
 # 5) The expanded widget's first line should read “Song Title • Artist”. The second
 # line is populated with the active playlist/album title when detectable.
 widget_builder_path = ROOT / 'smali/com/spotiduck/music/a.smali'
@@ -620,6 +701,56 @@ click_insert = '''    invoke-virtual {v7, v13, v0}, Landroid/widget/RemoteViews;
 widget_builder, click_count = click_pattern.subn(lambda _: click_insert, widget_builder, count=1)
 if click_count != 1:
     raise SystemExit('Could not uniquely find native widget fav-action insertion point.')
+# Replace the album-art fallback in this widget updater with a neutral placeholder.
+method_start = widget_builder.find('.method public static d(Landroid/content/Context;Landroid/appwidget/AppWidgetManager;I)V')
+method_end = widget_builder.find('.end method', method_start)
+if method_start < 0 or method_end < 0:
+    raise SystemExit('Could not isolate native widget update method for artwork patch.')
+method_end += len('.end method')
+widget_method = widget_builder[method_start:method_end]
+widget_method = widget_method.replace('0x7f0800d6', '0x7f08013b')
+image_call_anchor = ':goto_f\\n    return-void\\n.end method'
+if widget_method.count(image_call_anchor) != 1:
+    raise SystemExit('Could not find widget update return point for asynchronous tile artwork.')
+widget_method = widget_method.replace(
+    image_call_anchor,
+    ':goto_f\\n    if-eqz v3, :widget_tile_art_done\\n'
+    '    invoke-static {v0, v2, v7}, Lcom/spotiduck/music/a;->e(Landroid/content/Context;ILandroid/widget/RemoteViews;)V\\n'
+    '    :widget_tile_art_done\\n    return-void\\n.end method',
+    1)
+widget_builder = widget_builder[:method_start] + widget_method + widget_builder[method_end:]
+
+loader_method = ['.method public static e(Landroid/content/Context;ILandroid/widget/RemoteViews;)V', '    .locals 7', '']
+for i, image_id in enumerate(['0x7f090235', '0x7f090236', '0x7f090237', '0x7f090238', '0x7f090239'], 1):
+    next_label = f':widget_tile_art_{i+1}' if i < 5 else ':widget_tile_art_done'
+    loader_method.extend([
+        f'    sget-object v1, Lcom/spotiduck/music/WebService;->widgetTileImage{i}:Ljava/lang/String;',
+        f'    if-eqz v1, {next_label}',
+        '    invoke-virtual {v1}, Ljava/lang/String;->isEmpty()Z',
+        '    move-result v2',
+        f'    if-nez v2, {next_label}',
+        '    invoke-static {}, Lcom/squareup/picasso/Picasso;->get()Lcom/squareup/picasso/Picasso;',
+        '    move-result-object v0',
+        '    invoke-virtual {v0, v1}, Lcom/squareup/picasso/Picasso;->load(Ljava/lang/String;)Lcom/squareup/picasso/RequestCreator;',
+        '    move-result-object v2',
+        '    const/16 v3, 0x60',
+        '    invoke-virtual {v2, v3, v3}, Lcom/squareup/picasso/RequestCreator;->resize(II)Lcom/squareup/picasso/RequestCreator;',
+        '    move-result-object v2',
+        '    invoke-virtual {v2}, Lcom/squareup/picasso/RequestCreator;->centerCrop()Lcom/squareup/picasso/RequestCreator;',
+        '    move-result-object v2',
+        '    const/4 v3, 0x1',
+        '    new-array v4, v3, [I',
+        '    const/4 v5, 0x0',
+        '    aput p1, v4, v5',
+        f'    const v3, {image_id}',
+        '    invoke-virtual {v2, p2, v3, v4}, Lcom/squareup/picasso/RequestCreator;->into(Landroid/widget/RemoteViews;I[I)V',
+        f'    {next_label}' if i < 5 else ''
+    ])
+loader_method.extend(['    return-void', '.end method', ''])
+loader_text = '\\n'.join(loader_method)
+if 'widgetTileImage1' not in widget_builder:
+    raise SystemExit('Widget image fields are not declared in the bridge state.')
+widget_builder += loader_text
 widget_builder_path.write_text(widget_builder, encoding='utf-8')
 
 # Structural checks before rebuilding.
