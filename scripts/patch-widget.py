@@ -748,7 +748,7 @@ for i, image_id in enumerate(['0x7f090235', '0x7f090236', '0x7f090237', '0x7f090
     ])
 loader_method.extend(['    return-void', '.end method', ''])
 loader_text = '\n'.join(loader_method)
-if 'widgetTileImage1' not in widget_builder:
+if 'widgetTileImage1' not in service:
     raise SystemExit('Widget image fields are not declared in the bridge state.')
 widget_builder += loader_text
 widget_builder_path.write_text(widget_builder, encoding='utf-8')
