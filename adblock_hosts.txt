@@ -546,6 +546,7 @@
 0.0.0.0 d3vgkjyuhp91nc.cloudfront.net
 0.0.0.0 d810.mysanantonio.com
 0.0.0.0 d830x8j3o1b2k.cloudfront.net
+0.0.0.0 da.flvcdn.net
 0.0.0.0 dad-api.dcard.tw
 0.0.0.0 damoh.welect.de
 0.0.0.0 data-optout-service.uca.cloud.unity3d.com
@@ -1036,6 +1037,7 @@
 0.0.0.0 rsx.afterpay.com
 0.0.0.0 rtapi.abbi.io
 0.0.0.0 rtb.appbid.com
+0.0.0.0 rtb.nefta.app
 0.0.0.0 rtblab.net
 0.0.0.0 rugfrfji.win
 0.0.0.0 rule34.top
