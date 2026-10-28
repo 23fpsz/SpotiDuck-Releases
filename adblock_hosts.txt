@@ -433,6 +433,7 @@
 0.0.0.0 cdn-image.com
 0.0.0.0 cdn-ketchapp.akamaized.net
 0.0.0.0 cdn-rtb.sape.ru
+0.0.0.0 cdn-settings.af-sdk.com
 0.0.0.0 cdn.appnext.com
 0.0.0.0 cdn.batmobi.net
 0.0.0.0 cdn.jampp.com
@@ -728,6 +729,7 @@
 0.0.0.0 imgx.jampp.com
 0.0.0.0 impbid.com
 0.0.0.0 imrworldwide.com
+0.0.0.0 inapps.af-sdk.com
 0.0.0.0 indiatimes.com
 0.0.0.0 infolinks.com
 0.0.0.0 ingamesads.gameloft.com
