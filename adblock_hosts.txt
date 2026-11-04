@@ -351,6 +351,7 @@
 0.0.0.0 asdfasdasd9987.co
 0.0.0.0 assoc-amazon.com
 0.0.0.0 astrsk.net
+0.0.0.0 asttoxa.ru
 0.0.0.0 athena.api.kwalee.com
 0.0.0.0 atom-ds.com
 0.0.0.0 atti.com
