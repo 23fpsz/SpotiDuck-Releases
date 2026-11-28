@@ -1247,6 +1247,7 @@
 0.0.0.0 v8b9c0x1z2.sai7348.xyz
 0.0.0.0 velti.com
 0.0.0.0 verifyconnection.org
+0.0.0.0 vervecoffees.com
 0.0.0.0 veta.naver.com
 0.0.0.0 vg247-uk.vg247.com
 0.0.0.0 vidads.gr
